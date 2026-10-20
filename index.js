@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const http = require('http');
 
+// 1. Bot İzinleri (Intents)
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -9,17 +10,21 @@ const client = new Client({
   ]
 });
 
+// 2. Bot Hazır Olduğunda Çalışacak Kısım
 client.once('ready', () => {
   console.log(`Bot aktif: ${client.user.tag}`);
 });
 
+// 3. Mesaj Dinleyici
 client.on('messageCreate', message => {
+  if (message.author.bot) return;
+
   if (message.content === '!merhaba') {
     message.reply('Aleykümselam kraliçem!');
   }
 });
 
-// Render'ın tam aradığı 0.0.0.0 adresli web sunucusu
+// 4. Render'ın Kapanmasını Engelleyen Web Sunucusu
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -30,5 +35,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Web sunucusu ${PORT} portunda dinleniyor.`);
 });
 
-client.login('MTU2MTc4MTQ4Mzk2MDY2NDE3NA.GWqKzm.ccLkBeGvxZbQ9g_PBtI5Pg-jrPneunenLYb2fk');
-
+// 5. Discord'a Güvenli Giriş (Render Environment'tan Çeker)
+client.login(process.env.DISCORD_TOKEN);
