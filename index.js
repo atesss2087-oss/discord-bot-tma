@@ -101,8 +101,25 @@ function isAllCapsSpam(text) {
   );
 }
 
+function isSimpleGreeting(normalizedText) {
+  return /^s\s*a$/.test(normalizedText);
+}
+
 client.on("messageCreate", async (message) => {
   if (!message.guild || message.author.bot) return;
+
+  const original = message.content;
+  const normalizedMessage = normalize(original);
+
+  // Greetings are handled before moderation so SA is never blocked as caps spam.
+  if (isSimpleGreeting(normalizedMessage)) {
+    try {
+      await message.reply("as");
+    } catch (error) {
+      console.error("Greeting reply could not be sent:", error);
+    }
+    return;
+  }
 
   const member = message.member;
   if (!member) return;
@@ -113,8 +130,6 @@ client.on("messageCreate", async (message) => {
     member.permissions.has(PermissionsBitField.Flags.ManageMessages)
   ) return;
 
-  const original = message.content;
-  const normalizedMessage = normalize(original);
   const hasSevereTerm = containsBlockedTerm(
     normalizedMessage,
     NORMALIZED_KICK_PATTERNS
