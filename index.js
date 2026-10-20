@@ -125,8 +125,9 @@ client.on("messageCreate", async (message) => {
   );
   const isCapsSpam = isAllCapsSpam(original);
 
-  // Severe terms trigger a kick (not a permanent ban). Start deletion and
-  // kick together so neither action waits behind the other's network request.
+  // Kick wins if normalization makes a term overlap both tiers, such as
+  // sikiş and sikis, which both normalize to sikis. This is not a permanent ban.
+  // Start deletion and kick together to avoid serial network delay.
   if (hasSevereTerm) {
     const deletion = message.delete().catch((error) => {
       console.error("Otomatik moderasyon: mesaj silinemedi:", error);
