@@ -30,5 +30,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Web sunucusu ${PORT} portunda dinleniyor.`);
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login('MTU2MTc4MTQ4Mzk2MDY2NDE3NA.GWqKzm.ccLkBeGvxZbQ9g_PBtI5Pg-jrPneunenLYb2fk');
 
