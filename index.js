@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionsBitField, SlashCommandBuilder, REST, Routes } = require('discord.js');
 const express = require('express');
+const https = require('https');
 
 // --- 1. RENDER İÇİN EXPRESS SUNUCUSU ---
 const app = express();
@@ -44,35 +45,51 @@ const userLevels = new Map();
 
 // Yetkili Rol ID'leri
 const YETKILI_ROL_ID = '1533059872655151116';
-const BRANS_YETKILI_ROL_ID = '1531720799843647569';
-const ROBLOX_OYUN_LINKI = 'https://www.roblox.com/tr/games/80024713565142/TMA-T-rk-Asker-Oyunu';
+const ROBLOX_PLACE_ID = '80024713565142';
+const ROBLOX_OYUN_LINKI = `https://www.roblox.com/tr/games/${ROBLOX_PLACE_ID}/TMA-T-rk-Asker-Oyunu`;
+
+// Roblox Oyuncu Sayısını Çeken Fonksiyon
+function getRobloxPlayerCount() {
+    return new Promise((resolve) => {
+        const url = `https://games.roblox.com/v1/games?universeIds=${ROBLOX_PLACE_ID}`;
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (json && json.data && json.data.length > 0) {
+                        resolve(json.data[0].playing);
+                    } else {
+                        resolve(0);
+                    }
+                } catch (e) {
+                    resolve(0);
+                }
+            });
+        }).on('error', () => {
+            resolve(0);
+        });
+    });
+}
 
 client.once('ready', async () => {
     console.log(`Bot çevrimiçi: ${client.user.tag}`);
 
-    // Slash (/) komutlarını Discord'a kaydetme
     const commands = [
         new SlashCommandBuilder().setName('bilet').setDescription('Destek talebi (bilet) menüsünü açar.'),
         new SlashCommandBuilder().setName('rütbever').setDescription('Bir üyeye rütbe verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
         new SlashCommandBuilder().setName('rütbeal').setDescription('Bir üyeden rütbe alır.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol alınacak üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Alınacak rol').setRequired(true)),
         new SlashCommandBuilder().setName('tam-yasakla').setDescription('Kullanıcıyı veritabanından tamamen yasaklar.').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)),
-        new SlashCommandBuilder().setName('yenile').setDescription('Roblox verilerini yeniler.'),
         new SlashCommandBuilder().setName('oyun-yasak-kaldır').setDescription('Kullanıcının oyun yasağını kaldırır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('oyun-yasak-sorgu').setDescription('Kullanıcının oyun yasak durumunu sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('karaliste-rol-çıkar').setDescription('Bir rolün karalisteden çıkmasını sağlar.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
         new SlashCommandBuilder().setName('karaliste-rol-ekle').setDescription('Kara listeye rol ekler.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
         new SlashCommandBuilder().setName('karaliste-çıkar').setDescription('Kullanıcıyı kara listeden çıkarır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('karaliste-ekle').setDescription('Kullanıcıyı kara listeye ekler.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-tam-at').setDescription('Kullanıcıyı tüm branşlardan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('gamepass-sorgu').setDescription('Gamepass durumunu sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-terfi').setDescription('Branşta terfi ettirir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-ver').setDescription('Branşta rütbe verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-at').setDescription('Kullanıcıyı branştan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-istek').setDescription('Branş isteğini yönetir.'),
-        new SlashCommandBuilder().setName('branş-rütbe-rd').setDescription('Branşta rütbe düşürür.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-sorgu').setDescription('Branş rütbesini sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('bilgi').setDescription('Botun istatistiklerini gösterir.'),
-        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyununun aktiflik durumunu gösterir.'),
+        new SlashCommandBuilder().setName('bilgi').setDescription('Botun neler yapabildiğini ve özelliklerini gösterir.'),
+        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyununun canlı aktiflik durumunu gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-çağrı').setDescription('Tüm personelleri oyuna davet etmek için çağrı başlatır.')
     ].map(command => command.toJSON());
 
@@ -185,30 +202,18 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
         
-        // Yetki kontrolleri
         const isAdmin = interaction.member.permissions.has('Administrator');
         const hasGeneralPerm = isAdmin || interaction.member.roles.cache.has(YETKILI_ROL_ID);
-        const hasBransPerm = isAdmin || interaction.member.roles.cache.has(BRANS_YETKILI_ROL_ID);
 
-        // Branş komutları kontrolü
-        const bransKomutlari = ['branş-tam-at', 'branş-rütbe-terfi', 'branş-rütbe-ver', 'branş-at', 'branş-istek', 'branş-rütbe-rd', 'branş-rütbe-sorgu'];
-
-        if (bransKomutlari.includes(commandName)) {
-            if (!hasBransPerm) {
-                return interaction.reply({ content: 'Bu branş komutunu kullanmak için gerekli yetkiye sahip değilsin!', ephemeral: true });
-            }
-        } else {
-            // Diğer yetki gerektiren komutlar için ana yetkili rolü kontrolü
-            const yetkiGerektirenler = ['rütbever', 'rütbeal', 'tam-yasakla', 'oyun-yasak-kaldır', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle'];
-            if (yetkiGerektirenler.includes(commandName) && !hasGeneralPerm) {
-                return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
-            }
+        const yetkiGerektirenler = ['rütbever', 'rütbeal', 'tam-yasakla', 'oyun-yasak-kaldır', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle'];
+        if (yetkiGerektirenler.includes(commandName) && !hasGeneralPerm) {
+            return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
         }
 
         if (commandName === 'bilet') {
             const embed = new EmbedBuilder()
                 .setTitle('TMA - Destek Sistemi')
-                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe, branş üyeliği alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
+                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
                 .setColor(0x2f3136);
 
             const row = new ActionRowBuilder().addComponents(
@@ -217,21 +222,25 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ embeds: [embed], components: [row] });
         }
 
-        if (commandName === 'aktiflik-sorgu') {
+        if (commandName === 'bilgi') {
             const embed = new EmbedBuilder()
-                .setTitle('🎮 TMA - Oyun Aktiflik Durumu')
-                .setDescription('Sunucumuzun ana Roblox oyununun güncel durumunu aşağıdaki butona tıklayarak inceleyebilir ve oyuna giriş yapabilirsiniz!')
+                .setTitle('🤖 TMA Bot - Sistem Bilgileri')
+                .setDescription('Botumuz sunucunuzun güvenliği ve düzeni için şu profesyonel özelliklere sahiptir:\n\n🛡️ **Güvenlik & Filtreler:** Küfür engeli (3 dakika timeout), aşırı büyük harf ve hızlı spam koruması (2 dakika mute).\n🎮 **Oyun & Aktiflik:** Roblox oyun anlık aktiflik sorgulama ve tüm personellere özel aktiflik çağrısı gönderme.\n🎫 **Bilet Sistemi:** 7 farklı kategoride özel destek odası açabilme.\n⭐ **Seviye Sistemi:** Mesaj attıkça 10 kademeli seviye atlama sistemi.\n⚙️ **Yetki Komutları:** Rol verme/alma, yasaklama ve karaliste yönetim araçları.')
+                .setColor(0x3498DB);
+
+            return interaction.reply({ embeds: [embed], ephemeral: true });
+        }
+
+        if (commandName === 'aktiflik-sorgu') {
+            await interaction.deferReply(); // API yanıtı gecikirse bot hata vermesin diye bekletme açıyoruz
+            const playerCount = await getRobloxPlayerCount();
+
+            const embed = new EmbedBuilder()
+                .setTitle(`🟢 TMA oyununun aktifliği: ${playerCount}`)
+                .setDescription(`Sunucumuzun Roblox oyununa hemen katılmak için aşağıdaki bağlantıyı kullanabilirsiniz.\n\n🔗 [Oyuna Gitmek İçin Tıkla](${ROBLOX_OYUN_LINKI})`)
                 .setColor(0x00FF00);
 
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setStyle(ButtonStyle.Link)
-                    .setLabel('Oyuna Git / Aktifliği Gör')
-                    .setURL(ROBLOX_OYUN_LINKI)
-                    .setEmoji('🔗')
-            );
-
-            return interaction.reply({ embeds: [embed], components: [row] });
+            return interaction.editReply({ embeds: [embed] });
         }
 
         if (commandName === 'aktiflik-çağrı') {
@@ -274,7 +283,7 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // Diğer özel komutların yanıtları
+        // Diğer kalan komutların yanıtları
         return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
     }
 
