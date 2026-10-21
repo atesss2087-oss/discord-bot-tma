@@ -2,12 +2,13 @@
 {
   "name": "discord-moderation-bot",
   "version": "1.0.0",
-  "description": "Discord bot with moderation and automatic replies",
+  "description": "Discord moderation bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.19.3"
+    "discord.js": "^14.19.3",
+    "express": "^5.1.0"
   }
 }
