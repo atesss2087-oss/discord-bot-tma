@@ -42,8 +42,9 @@ const userMessageMap = new Map();
 const userMessageCounts = new Map();
 const userLevels = new Map();
 
-// Yetkili Rol ID'si (Bu rol ve üstü komut kullanabilir)
+// Yetkili Rol ID'leri
 const YETKILI_ROL_ID = '1533059872655151116';
+const BRANS_YETKILI_ROL_ID = '1531720799843647569';
 const ROBLOX_OYUN_LINKI = 'https://www.roblox.com/tr/games/80024713565142/TMA-T-rk-Asker-Oyunu';
 
 client.once('ready', async () => {
@@ -183,11 +184,30 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
-        const hasPermission = interaction.member.permissions.has('Administrator') || interaction.member.roles.cache.has(YETKILI_ROL_ID);
+        
+        // Yetki kontrolleri
+        const isAdmin = interaction.member.permissions.has('Administrator');
+        const hasGeneralPerm = isAdmin || interaction.member.roles.cache.has(YETKILI_ROL_ID);
+        const hasBransPerm = isAdmin || interaction.member.roles.cache.has(BRANS_YETKILI_ROL_ID);
+
+        // Branş komutları kontrolü
+        const bransKomutlari = ['branş-tam-at', 'branş-rütbe-terfi', 'branş-rütbe-ver', 'branş-at', 'branş-istek', 'branş-rütbe-rd', 'branş-rütbe-sorgu'];
+
+        if (bransKomutlari.includes(commandName)) {
+            if (!hasBransPerm) {
+                return interaction.reply({ content: 'Bu branş komutunu kullanmak için gerekli yetkiye sahip değilsin!', ephemeral: true });
+            }
+        } else {
+            // Diğer yetki gerektiren komutlar için ana yetkili rolü kontrolü
+            const yetkiGerektirenler = ['rütbever', 'rütbeal', 'tam-yasakla', 'oyun-yasak-kaldır', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle'];
+            if (yetkiGerektirenler.includes(commandName) && !hasGeneralPerm) {
+                return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
+            }
+        }
 
         if (commandName === 'bilet') {
             const embed = new EmbedBuilder()
-                .setTitle('Türkiye Harp Okulu - Destek Sistemi')
+                .setTitle('TMA - Destek Sistemi')
                 .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe, branş üyeliği alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
                 .setColor(0x2f3136);
 
@@ -199,7 +219,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (commandName === 'aktiflik-sorgu') {
             const embed = new EmbedBuilder()
-                .setTitle('🎮 Türkiye Harp Okulu - Oyun Aktiflik Durumu')
+                .setTitle('🎮 TMA - Oyun Aktiflik Durumu')
                 .setDescription('Sunucumuzun ana Roblox oyununun güncel durumunu aşağıdaki butona tıklayarak inceleyebilir ve oyuna giriş yapabilirsiniz!')
                 .setColor(0x00FF00);
 
@@ -228,13 +248,11 @@ client.on('interactionCreate', async (interaction) => {
                     .setEmoji('🚀')
             );
 
-            // Kanalda doğrudan @everyone ile mesaj gönderme
             await interaction.channel.send({ content: '@everyone', embeds: [embed], components: [row] });
             return interaction.reply({ content: 'Aktiflik çağrısı başarıyla gönderildi!', ephemeral: true });
         }
 
         if (commandName === 'rütbever') {
-            if (!hasPermission) return interaction.reply({ content: 'Bu komutu kullanmak için yetkin yok!', ephemeral: true });
             const targetMember = interaction.options.getMember('kullanici');
             const targetRole = interaction.options.getRole('rol');
             try {
@@ -246,7 +264,6 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (commandName === 'rütbeal') {
-            if (!hasPermission) return interaction.reply({ content: 'Bu komutu kullanmak için yetkin yok!', ephemeral: true });
             const targetMember = interaction.options.getMember('kullanici');
             const targetRole = interaction.options.getRole('rol');
             try {
@@ -258,11 +275,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // Diğer özel komutların yanıtları
-        const digerKomutlar = ['tam-yasakla', 'yenile', 'oyun-yasak-kaldır', 'oyun-yasak-sorgu', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle', 'branş-tam-at', 'gamepass-sorgu', 'branş-rütbe-terfi', 'branş-rütbe-ver', 'branş-at', 'branş-istek', 'branş-rütbe-rd', 'branş-rütbe-sorgu', 'bilgi'];
-        
-        if (digerKomutlar.includes(commandName)) {
-            return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
-        }
+        return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
     }
 
     // Bilet Butonu Yönetimi
