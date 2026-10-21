@@ -184,7 +184,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (commandName === 'bilet') {
             const embed = new EmbedBuilder()
-                .setTitle('THO | Türkiye Harp Okulu')
+                .setTitle('TMA | Türkiye Harp Okulu')
                 .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butonuna tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe, branş üyeliği alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönemk İçin Bu Bileti Kullana Bilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kulana Bilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
                 .setColor(0x2f3136);
 
@@ -218,7 +218,7 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // Diğer özel komutların yanıtları (Boşta hata vermemesi için eklendi)
+        // Diğer özel komutların yanıtları
         const digerKomutlar = ['tam-yasakla', 'yenile', 'oyun-yasak-kaldır', 'oyun-yasak-sorgu', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle', 'branş-tam-at', 'gamepass-sorgu', 'branş-rütbe-terfi', 'branş-rütbe-ver', 'branş-at', 'branş-istek', 'branş-rütbe-rd', 'branş-rütbe-sorgu', 'bilgi'];
         
         if (digerKomutlar.includes(commandName)) {
