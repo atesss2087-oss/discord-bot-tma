@@ -1,7 +1,8 @@
+```javascript
 const { Client, GatewayIntentBits } = require('discord.js');
 const http = require('http');
 
-// Render'in uykuya geçmesini önleyen mini web sunucusu
+// Render'in uykuya gecmesini onleyen mini web sunucusu
 http.createServer((req, res) => {
   res.write("Bot 7/24 Aktif!");
   res.end();
@@ -16,28 +17,28 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log('Bot basariyla aktif oldu!');
+  console.log(`Bot basariyla aktif oldu! Logged in as ${client.user.tag}`);
 });
 
 client.on('messageCreate', (message) => {
-  // Botlarin kendi mesajlarini engelle
+  // Botlarin kendi mesajlarini veya diger botlari engelle
   if (message.author.bot) return;
 
-  const originalContent = message.content;
+  const originalContent = message.content.trim();
   const content = originalContent.toLowerCase();
 
-  // 1. SA-AS Yaniti
-  if (content === 'sa' || content === 'sa cumleten') {
-    message.reply('Aleykümselam! Hoş geldin 👋');
+  // 1. SA - AS Yaniti
+  if (content === 'sa' || content === 'sa cumleten' || content === 'selamın aleyküm' || content === 'selamin aleykum' || content === 'selamun aleykum') {
+    return message.reply('Aleykümselam, hoş geldin reis! 👋');
   }
 
-  // 2. Caps Lock Engeli
+  // 2. Caps Lock (Büyük Harf) Engeli
   if (originalContent.length > 5 && originalContent === originalContent.toUpperCase() && /[A-ZĞÜŞİÖÇ]/.test(originalContent)) {
     message.delete().catch(() => {});
-    return message.channel.send('⚠️ Lütfen tamamı büyük harflerle mesaj yazma!');
+    return message.channel.send(`⚠️ ${message.author}, lütfen tamamı büyük harflerle mesaj yazma!`);
   }
 
-  // 3. Küfür & Yasakli Kelime Filtresi
+  // 3. Küfür & Yasaklı Kelime Filtresi
   const badWords = [
     'amk', 'aq', 'aw', 'mq', 'oe', 'oç', 'oc', 'sik', 'sikti', 'piç',
     'annen', 'anne', 'üvey kızkardeş', 'bebeğim', 'gülüm',
@@ -49,7 +50,7 @@ client.on('messageCreate', (message) => {
 
   if (badWords.some(word => content.includes(word))) {
     message.delete().catch(() => {});
-    return message.channel.send('⚠️ Lütfen yasaklı kelime/küfür kullanma!');
+    return message.channel.send(`⚠️ ${message.author}, lütfen yasaklı kelime / küfür kullanma!`);
   }
 });
 
