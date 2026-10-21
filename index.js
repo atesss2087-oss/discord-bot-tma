@@ -43,8 +43,9 @@ const userMessageMap = new Map();
 const userMessageCounts = new Map();
 const userLevels = new Map();
 
-// Yetkili Rol ID'leri
+// Yetkili ve Rol ID'leri
 const YETKILI_ROL_ID = '1533059872655151116';
+const ASKERI_PERSONEL_ROL_ID = '1533059872655151116'; // Askeri Personel Rol ID'si (Gerekirse kendi rol ID'n ile değiştirebilirsin)
 const ROBLOX_PLACE_ID = '80024713565142';
 const ROBLOX_OYUN_LINKI = `https://www.roblox.com/tr/games/${ROBLOX_PLACE_ID}/TMA-T-rk-Asker-Oyunu`;
 
@@ -199,115 +200,119 @@ client.on('messageCreate', async (message) => {
 
 // --- SLASH (/) VE BUTON ETKİLEŞİMLERİ ---
 client.on('interactionCreate', async (interaction) => {
-    if (interaction.isChatInputCommand()) {
-        const { commandName } = interaction;
-        
-        const isAdmin = interaction.member.permissions.has('Administrator');
-        const hasGeneralPerm = isAdmin || interaction.member.roles.cache.has(YETKILI_ROL_ID);
+    if (!interaction.isChatInputCommand()) return; // Çift tetiklenmeyi ve hata almayı tamamen önler
 
-        const yetkiGerektirenler = ['rütbever', 'rütbeal', 'tam-yasakla', 'oyun-yasak-kaldır', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle'];
-        if (yetkiGerektirenler.includes(commandName) && !hasGeneralPerm) {
-            return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
-        }
+    const { commandName } = interaction;
+    
+    const isAdmin = interaction.member.permissions.has('Administrator');
+    const hasGeneralPerm = isAdmin || interaction.member.roles.cache.has(YETKILI_ROL_ID);
 
-        if (commandName === 'bilet') {
-            const embed = new EmbedBuilder()
-                .setTitle('TMA - Destek Sistemi')
-                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
-                .setColor(0x2f3136);
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('create_ticket').setLabel('Destek Talebi Oluştur').setStyle(ButtonStyle.Secondary).setEmoji('🎫')
-            );
-            return interaction.reply({ embeds: [embed], components: [row] });
-        }
-
-        if (commandName === 'bilgi') {
-            const embed = new EmbedBuilder()
-                .setTitle('🤖 TMA Bot - Sistem Bilgileri')
-                .setDescription('Botumuz sunucunuzun güvenliği ve düzeni için şu profesyonel özelliklere sahiptir:\n\n🛡️ **Güvenlik & Filtreler:** Küfür engeli (3 dakika timeout), aşırı büyük harf ve hızlı spam koruması (2 dakika mute).\n🎮 **Oyun & Aktiflik:** Roblox oyun anlık aktiflik sorgulama ve tüm personellere özel aktiflik çağrısı gönderme.\n🎫 **Bilet Sistemi:** 7 farklı kategoride özel destek odası açabilme.\n⭐ **Seviye Sistemi:** Mesaj attıkça 10 kademeli seviye atlama sistemi.\n⚙️ **Yetki Komutları:** Rol verme/alma, yasaklama ve karaliste yönetim araçları.')
-                .setColor(0x3498DB);
-
-            return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        if (commandName === 'aktiflik-sorgu') {
-            await interaction.deferReply(); // API yanıtı gecikirse bot hata vermesin diye bekletme açıyoruz
-            const playerCount = await getRobloxPlayerCount();
-
-            const embed = new EmbedBuilder()
-                .setTitle(`🟢 TMA oyununun aktifliği: ${playerCount}`)
-                .setDescription(`Sunucumuzun Roblox oyununa hemen katılmak için aşağıdaki bağlantıyı kullanabilirsiniz.\n\n🔗 [Oyuna Gitmek İçin Tıkla](${ROBLOX_OYUN_LINKI})`)
-                .setColor(0x00FF00);
-
-            return interaction.editReply({ embeds: [embed] });
-        }
-
-        if (commandName === 'aktiflik-çağrı') {
-            const embed = new EmbedBuilder()
-                .setTitle('🚨 OYUN AKTİFLİK ÇAĞRISI!')
-                .setDescription(`Tüm TMA personelleri oyuna davet ediliyor! Seriler, eğitimler ve aktiflik için herkes sunucuya bekleniyor.\n\n📌 **Çağrıyı Yapan Yetkili:** ${interaction.user}`)
-                .setColor(0xFF0000);
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setStyle(ButtonStyle.Link)
-                    .setLabel('Oyuna Katıl')
-                    .setURL(ROBLOX_OYUN_LINKI)
-                    .setEmoji('🚀')
-            );
-
-            await interaction.channel.send({ content: '@everyone', embeds: [embed], components: [row] });
-            return interaction.reply({ content: 'Aktiflik çağrısı başarıyla gönderildi!', ephemeral: true });
-        }
-
-        if (commandName === 'rütbever') {
-            const targetMember = interaction.options.getMember('kullanici');
-            const targetRole = interaction.options.getRole('rol');
-            try {
-                await targetMember.roles.add(targetRole);
-                return interaction.reply({ content: `Başarıyla ${targetMember} adlı üyeye **${targetRole.name}** rütbesi verildi!`, ephemeral: true });
-            } catch (err) {
-                return interaction.reply({ content: 'Rol verilemedi! Botun rolü verilecek rolden yukarıda olmalı.', ephemeral: true });
-            }
-        }
-
-        if (commandName === 'rütbeal') {
-            const targetMember = interaction.options.getMember('kullanici');
-            const targetRole = interaction.options.getRole('rol');
-            try {
-                await targetMember.roles.remove(targetRole);
-                return interaction.reply({ content: `Başarıyla ${targetMember} adlı üyeden **${targetRole.name}** rütbesi alındı!`, ephemeral: true });
-            } catch (err) {
-                return interaction.reply({ content: 'Rol alınamadı!', ephemeral: true });
-            }
-        }
-
-        // Diğer kalan komutların yanıtları
-        return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
+    const yetkiGerektirenler = ['rütbever', 'rütbeal', 'tam-yasakla', 'oyun-yasak-kaldır', 'karaliste-rol-çıkar', 'karaliste-rol-ekle', 'karaliste-çıkar', 'karaliste-ekle'];
+    if (yetkiGerektirenler.includes(commandName) && !hasGeneralPerm) {
+        return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
     }
 
-    // Bilet Butonu Yönetimi
-    if (interaction.isButton() && interaction.customId === 'create_ticket') {
-        const guild = interaction.guild;
-        const member = interaction.member;
+    if (commandName === 'bilet') {
+        const embed = new EmbedBuilder()
+            .setTitle('TMA - Destek Sistemi')
+            .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
+            .setColor(0x2f3136);
 
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('create_ticket').setLabel('Destek Talebi Oluştur').setStyle(ButtonStyle.Secondary).setEmoji('🎫')
+        );
+        return interaction.reply({ embeds: [embed], components: [row] });
+    }
+
+    if (commandName === 'bilgi') {
+        const embed = new EmbedBuilder()
+            .setTitle('🤖 TMA Bot - Sistem Bilgileri')
+            .setDescription('Botumuz sunucunuzun güvenliği ve düzeni için şu profesyonel özelliklere sahiptir:\n\n🛡️ **Güvenlik & Filtreler:** Küfür engeli (3 dakika timeout), aşırı büyük harf ve hızlı spam koruması (2 dakika mute).\n🎮 **Oyun & Aktiflik:** Roblox oyun anlık aktiflik sorgulama ve tüm personellere özel aktiflik çağrısı gönderme.\n🎫 **Bilet Sistemi:** 7 farklı kategoride özel destek odası açabilme.\n⭐ **Seviye Sistemi:** Mesaj attıkça 10 kademeli seviye atlama sistemi.\n⚙️ **Yetki Komutları:** Rol verme/alma, yasaklama ve karaliste yönetim araçları.')
+            .setColor(0x3498DB);
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    if (commandName === 'aktiflik-sorgu') {
+        await interaction.deferReply(); 
+        const playerCount = await getRobloxPlayerCount();
+
+        const embed = new EmbedBuilder()
+            .setTitle(`🟢 TMA oyununun aktifliği: ${playerCount}`)
+            .setDescription(`Sunucumuzun Roblox oyununa hemen katılmak için aşağıdaki bağlantıyı kullanabilirsiniz.\n\n🔗 [Oyuna Gitmek İçin Tıkla](${ROBLOX_OYUN_LINKI})`)
+            .setColor(0x00FF00);
+
+        return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (commandName === 'aktiflik-çağrı') {
+        const embed = new EmbedBuilder()
+            .setTitle('🚨 OYUN AKTİFLİK ÇAĞRISI!')
+            .setDescription(`Tüm TMA personelleri oyuna davet ediliyor! Seriler, eğitimler ve aktiflik için herkes sunucuya bekleniyor.\n\n📌 **Çağrıyı Yapan Yetkili:** ${interaction.user}`)
+            .setColor(0xFF0000);
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setStyle(ButtonStyle.Link)
+                .setLabel('Oyuna Katıl')
+                .setURL(ROBLOX_OYUN_LINKI)
+                .setEmoji('🚀')
+        );
+
+        // everyone yerine özel Askeri Personel rolünü etiketleme
+        await interaction.channel.text({ content: `<@&${ASKERI_PERSONEL_ROL_ID}>`, embeds: [embed], components: [row] }).catch(() => {
+            interaction.channel.send({ content: `<@&${ASKERI_PERSONEL_ROL_ID}>`, embeds: [embed], components: [row] });
+        });
+        return interaction.reply({ content: 'Aktiflik çağrısı başarıyla gönderildi!', ephemeral: true });
+    }
+
+    if (commandName === 'rütbever') {
+        const targetMember = interaction.options.getMember('kullanici');
+        const targetRole = interaction.options.getRole('rol');
         try {
-            const ticketChannel = await guild.channels.create({
-                name: `bilet-${member.user.username}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                    { id: YETKILI_ROL_ID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                ],
-            });
-
-            await interaction.reply({ content: `Destek talebin başarıyla oluşturuldu: ${ticketChannel}`, ephemeral: true });
-            await ticketChannel.send(`Hoş geldin ${member}! Yetkililerimiz en kısa sürede seninle ilgilenecektir.`);
+            await targetMember.roles.add(targetRole);
+            return interaction.reply({ content: `Başarıyla ${targetMember} adlı üyeye **${targetRole.name}** rütbesi verildi!`, ephemeral: true });
         } catch (err) {
-            await interaction.reply({ content: 'Bilet kanalı oluşturulurken bir hata oluştu!', ephemeral: true });
+            return interaction.reply({ content: 'Rol verilemedi! Botun rolü verilecek rolden yukarıda olmalı.', ephemeral: true });
         }
+    }
+
+    if (commandName === 'rütbeal') {
+        const targetMember = interaction.options.getMember('kullanici');
+        const targetRole = interaction.options.getRole('rol');
+        try {
+            await targetMember.roles.remove(targetRole);
+            return interaction.reply({ content: `Başarıyla ${targetMember} adlı üyeden **${targetRole.name}** rütbesi alındı!`, ephemeral: true });
+        } catch (err) {
+            return interaction.reply({ content: 'Rol alınamadı!', ephemeral: true });
+        }
+    }
+
+    return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
+});
+
+// Bilet Butonu Yönetimi (Ayrı bir dinleyici olarak güvenli hale getirildi)
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton() || interaction.customId !== 'create_ticket') return;
+
+    const guild = interaction.guild;
+    const member = interaction.member;
+
+    try {
+        const ticketChannel = await guild.channels.create({
+            name: `bilet-${member.user.username}`,
+            type: ChannelType.GuildText,
+            permissionOverwrites: [
+                { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                { id: YETKILI_ROL_ID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+            ],
+        });
+
+        await interaction.reply({ content: `Destek talebin başarıyla oluşturuldu: ${ticketChannel}`, ephemeral: true });
+        await ticketChannel.send(`Hoş geldin ${member}! Yetkililerimiz en kısa sürede seninle ilgilenecektir.`);
+    } catch (err) {
+        await interaction.reply({ content: 'Bilet kanalı oluşturulurken bir hata oluştu!', ephemeral: true });
     }
 });
 
