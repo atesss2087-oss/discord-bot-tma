@@ -1,198 +1,64 @@
-
-const {
-  Client,
-  GatewayIntentBits,
-  PermissionsBitField
-} = require("discord.js");
+```javascript
+const { Client, GatewayIntentBits } = require('discord.js');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
   ]
 });
 
-const PREFIX = "!";
+client.once('ready', () => {
+  console.log(`✅ Bot başarıyla aktif oldu: ${client.user.tag}`);
+});
 
-const KICK_TERMS = [
-  // Adult sites and terms
-  "pornhub", "porn", "porno", "turuncu site", "hdabla", "üvey kızkardeş",
-  "onlyfans", "xvideos", "redtube", "brazzers", "hentai", "nude",
-  // Sexual acts
-  "sex", "seks", "doggy", "69", "31", "sokuş", "sikiş", "grup sex",
-  "anal", "oral", "escort", "eskort",
-  // Gangs and substances
-  "steroid", "çete", "dalton", "uyuşturucu", "esrar", "bonzai", "kokain"
-];
+client.on('messageCreate', (message) => {
+  // Botların kendi mesajlarını engelle
+  if (message.author.bot) return;
 
-const DELETE_TERMS = [
-  // Profanity abbreviations and shortened curses
-  "oe", "oç", "oc", "aq", "mq", "aw", "o.ç", "o.e",
-  // Violence and threat expressions
-  "kafası yerde yatıo", "kafası yerde", "keserim",
-  // Anatomical and organ terms
-  "pipi", "daşşak", "taşşak", "testis", "sperm", "vajna", "vajina",
-  "vagina", "am", "amcık", "yarrak", "yarak", "sik", "sikis", "meme",
-  "göğüs", "mahrem", "penis", "klitoris", "got", "göt", "anus",
-  // Family and spiritual insults (exact term matches)
-  "annen", "annenin", "anne", "bacı", "bacın", "sülalen", "ecdadın",
-  "avradın", "karını", "kızını", "dini", "imanı", "allahı", "kitabı",
-  "bebeğim", "gülüm",
-  // Gross and bathroom terms
-  "sidik", "sıçmak", "sıçtım", "ossurdum", "kaka", "balgam", "bok",
-  "dışkı", "ishal",
-  // Sexualized context and clothing
-  "tayt", "crop", "don", "külot", "sütyen", "tangası",
-  // General profanity and weapons
-  "sikti", "sikerim", "orospu", "piç", "kahpe", "götveren", "yarram",
-  "sikim", "alkol", "sigara", "silah", "mermi", "bıçak",
-  // Keep terms already filtered by the existing bot
-  "amk", "siktir", "ananı sikeyim"
-];
+  const originalContent = message.content;
+  const content = originalContent.toLowerCase();
 
-const LINK_REGEX =
-  /(?:https?:\/\/|www\.|discord\.gg\/|discord(?:app)?\.com\/invite\/|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?)/i;
-
-function normalize(text) {
-  return String(text)
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    // Fold Turkish dotless i as well as accented characters.
-    .replace(/ı/g, "i")
-    // Retain the bot's existing common leetspeak substitutions.
-    .replace(/[1|]/g, "i")
-    .replace(/0/g, "o")
-    .replace(/3/g, "e")
-    .replace(/4/g, "a")
-    .replace(/[5$]/g, "s")
-    // Collapse punctuation/symbols inserted inside a word, then retain
-    // whitespace so short blocked terms cannot match inside normal words.
-    .replace(/([\p{L}\p{N}])[\p{P}\p{S}]+(?=[\p{L}\p{N}])/gu, "$1")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function compileTerms(terms) {
-  return Array.from(new Set(terms.map(normalize).filter(Boolean))).map((term) => {
-    const pattern = term
-      .split(" ")
-      .map((word) => Array.from(word).join("\\s*"))
-      .join("\\s*");
-    return new RegExp("(?:^|\\s)" + pattern + "(?=\\s|$)", "u");
-  });
-}
-
-const NORMALIZED_KICK_PATTERNS = compileTerms(KICK_TERMS);
-const NORMALIZED_DELETE_PATTERNS = compileTerms(DELETE_TERMS);
-
-function containsBlockedTerm(normalizedText, patterns) {
-  return patterns.some((pattern) => pattern.test(normalizedText));
-}
-
-function isAllCapsSpam(text) {
-  const casedLetters = Array.from(text).filter((character) =>
-    /\p{Lu}|\p{Ll}/u.test(character)
-  );
-  return casedLetters.length > 0 && casedLetters.every((character) =>
-    /\p{Lu}/u.test(character)
-  );
-}
-
-function isSimpleGreeting(normalizedText) {
-  return /^s\s*a$/.test(normalizedText);
-}
-
-client.on("messageCreate", async (message) => {
-  if (!message.guild || message.author.bot) return;
-
-  const original = message.content;
-  const normalizedMessage = normalize(original);
-
-  // Greetings are handled before moderation so SA is never blocked as caps spam.
-  if (isSimpleGreeting(normalizedMessage)) {
-    try {
-      await message.reply("as");
-    } catch (error) {
-      console.error("Greeting reply could not be sent:", error);
-    }
-    return;
+  // 1. SA-AS Yanıtı
+  if (content === 'sa' || content === 'sa cümleten') {
+    message.reply('Aleykümselam! Hoş geldin 👋');
   }
 
-  const member = message.member;
-  if (!member) return;
-
-  // Keep the existing exemption for administrators and message moderators.
-  if (
-    member.permissions.has(PermissionsBitField.Flags.Administrator) ||
-    member.permissions.has(PermissionsBitField.Flags.ManageMessages)
-  ) return;
-
-  const hasSevereTerm = containsBlockedTerm(
-    normalizedMessage,
-    NORMALIZED_KICK_PATTERNS
-  );
-  const hasDeleteTerm = containsBlockedTerm(
-    normalizedMessage,
-    NORMALIZED_DELETE_PATTERNS
-  );
-  const isCapsSpam = isAllCapsSpam(original);
-
-  // Kick wins if normalization makes a term overlap both tiers, such as
-  // sikiş and sikis, which both normalize to sikis. This is not a permanent ban.
-  // Start deletion and kick together to avoid serial network delay.
-  if (hasSevereTerm) {
-    const deletion = message.delete().catch((error) => {
-      console.error("Otomatik moderasyon: mesaj silinemedi:", error);
-    });
-    const kick = member.kick("Otomatik moderasyon: ağır yasaklı terim").catch((error) => {
-      console.error("Otomatik moderasyon: kullanıcı atılamadı:", error);
-    });
-    await Promise.all([deletion, kick]);
-    return;
+  // 2. Caps Lock / Tamamı Büyük Harf Engeli (Büyük harfle mesaj yazılmasını engeller)
+  if (originalContent.length > 5 && originalContent === originalContent.toUpperCase() && /[A-ZĞÜŞİÖÇ]/.test(originalContent)) {
+    message.delete().catch(() => {});
+    return message.channel.send(`⚠️ ${message.author}, lütfen tamamı büyük harflerle mesaj yazma!`);
   }
 
-  // Lower-level terms and all-caps messages are deleted without a timeout.
-  if (hasDeleteTerm || isCapsSpam) {
-    try {
-      await message.delete();
-    } catch (error) {
-      console.error("Otomatik moderasyon: mesaj silinemedi:", error);
-    }
-    return;
-  }
+  // 3. Küfür, Argo & Yasaklı Kelime Filtresi (Görsellerdeki Tüm Kelimeler Dahil)
+  const badWords = [
+    // Temel Küfürler & Kısaltmalar
+    'amk', 'aq', 'aw', 'mq', 'oe', 'oç', 'oc', 'sik', 'sikti', 'piç',
+    
+    // Aile & Şahıs & Hitaplar
+    'annen', 'anne', 'üvey kızkardeş', 'bebeğim', 'gülüm',
+    
+    // Organlar, Cinsellik & Argo
+    'pipi', 'daşşak', 'testis', 'sperm', 'vajna', 'sex', 'doggy', '69', '31', 'meme', 'göğüs', 'mahrem',
+    
+    // Yetiskin Icerik / İfşa / Siteler
+    'porn', 'pornhub', 'hdabla', 'ifşa', 'turuncusite',
+    
+    // Zararlı Maddeler, Şiddet & Gruplar
+    'alkol', 'sigara', 'silah', 'steroid', 'çete', 'dalton',
+    
+    // Rahatsız Edici Sözler & Giysi/Doku
+    'balgam', 'sidik', 'sıçmak', 'sıçtım', 'ossurdum', 'kaka', 'tayt crop', 'don'
+  ];
 
-  const linkVar = LINK_REGEX.test(original);
-
-  // Link: delete the message and keep the existing temporary warning.
-  if (linkVar) {
-    try {
-      await message.delete();
-
-      const uyari = await message.channel.send(
-        "🔗 " + message.author + ", bu sunucuda link paylaşmak yasak."
-      );
-
-      setTimeout(() => {
-        uyari.delete().catch(() => {});
-      }, 5000);
-    } catch (error) {
-      console.error("Link engeli uygulanamadı:", error);
-    }
-
-    return;
-  }
-
-  // Basit komut: !ping
-  if (original.toLowerCase() === PREFIX + "ping") {
-    await message.reply("🏓 Pong!");
+  // Mesajın içinde yasaklı kelimelerden biri geçiyor mu kontrol et (Küçük/Büyük harf fark etmez)
+  if (badWords.some(word => content.includes(word))) {
+    message.delete().catch(() => {});
+    return message.channel.send(`⚠️ ${message.author}, lütfen yasaklı kelime/küfür kullanma!`);
   }
 });
 
-client.once("ready", () => {
-  console.log(client.user.tag + " aktif!");
-});
-
+// Render veya Environment Variables kısmındaki DISCORD_TOKEN ile giriş yapar
 client.login(process.env.DISCORD_TOKEN);
+```
