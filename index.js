@@ -1,77 +1,116 @@
-const fs = require('fs');
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
 
-// Susturulmayacak rolün ID'si
-const HOLDER_ROLE_ID = '1532129489495130233';
+const {
+  Client,
+  GatewayIntentBits,
+  PermissionsBitField
+} = require("discord.js");
+const fs = require("node:fs");
 
-// Yasaklı kelimeler dosyası
-const badWords = JSON.parse(
-    fs.readFileSync('./badwords.json', 'utf8')
-).map(word => normalize(word));
+const token = process.env.DISCORD_TOKEN;
 
-function normalize(text) {
-    return text
-        .normalize('NFKC')
-        .toLocaleLowerCase('tr-TR')
-        .replace(/[^\p{L}\p{N}]/gu, '');
+if (!token) {
+  throw new Error("DISCORD_TOKEN ortam değişkeni ayarlanmamış!");
 }
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Channel]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-client.on('messageCreate', async message => {
-    if (!message.guild || message.author.bot || !message.member) return;
+const config = JSON.parse(
+  fs.readFileSync("./badwords.json", "utf8")
+);
 
-    // Belirtilen role sahip kullanıcıları muaf tut
-    if (message.member.roles.cache.has(HOLDER_ROLE_ID)) return;
+const words = Array.isArray(config)
+  ? config
+  : config.words;
 
-    const original = message.content;
+if (!Array.isArray(words)) {
+  throw new Error("badwords.json bir dizi veya { words: [] } olmalı.");
+}
 
-    // Büyük harf kullanımını kontrol et
-    const letters = original.replace(/[^\p{L}]/gu, '');
-    const excessiveCaps =
-        letters.length >= 6 &&
-        letters === letters.toLocaleUpperCase('tr-TR');
+function normalize(text) {
+  return text
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFKC")
+    .replace(/[.,!?;:()[\]{}"'`]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-    // Yasaklı kelime kontrolü
-    const normalized = normalize(original);
-    const hasBadWord = badWords.some(word =>
-        word.length > 0 && normalized.includes(normalize(word))
+const badWords = [...new Set(
+  words.map(normalize).filter(Boolean)
+)].sort((a, b) => b.length - a.length);
+
+function containsBadWord(content) {
+  const text = ` ${normalize(content)} `;
+
+  return badWords.some(word => {
+    const escaped = word.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&"
     );
 
-    if (!excessiveCaps && !hasBadWord) return;
+    const pattern = new RegExp(
+      `(^|\\s)${escaped}(?=\\s|$)`,
+      "u"
+    );
 
-    // Mesajı sil
-    try {
-        await message.delete();
-    } catch (error) {
-        console.error('Mesaj silinemedi:', error.message);
-    }
+    return pattern.test(text);
+  });
+}
 
-    // 3 dakika sustur
-    try {
+client.once("ready", () => {
+  console.log(`${client.user.tag} çevrimiçi!`);
+});
+
+client.on("messageCreate", async message => {
+  if (!message.guild || message.author.bot) return;
+
+  try {
+    // Önce filtre, sonra otomatik cevaplar.
+    if (containsBadWord(message.content)) {
+      await message.delete();
+
+      if (
+        message.member &&
+        message.guild.members.me?.permissions.has(
+          PermissionsBitField.Flags.ModerateMembers
+        )
+      ) {
         await message.member.timeout(
-            3 * 60 * 1000,
-            excessiveCaps
-                ? 'Aşırı büyük harf kullanımı'
-                : 'Yasaklı kelime kullanımı'
+          180_000,
+          "Yasaklı kelime filtresi"
         );
-    } catch (error) {
-        console.error('Susturma uygulanamadı:', error.message);
+      }
+
+      const warning = await message.channel.send(
+        `⚠️ ${message.author}, yasaklı kelime kullandığın için 3 dakika susturuldun!`
+      );
+
+      setTimeout(() => {
+        warning.delete().catch(() => {});
+      }, 5000);
+
+      return;
     }
+
+    const text = normalize(message.content);
+
+    if (/^sa[!.?]*$/.test(text)) {
+      await message.reply("Aleyküm selam, hoş geldin reis 💙");
+      return;
+    }
+
+    if (/\b(napıyonuz|napıypnuz|napıyorsunuz)\b/u.test(text)) {
+      await message.reply("İyi senden naber reis 😎");
+    }
+  } catch (error) {
+    console.error("Mesaj işleme hatası:", error);
+  }
 });
 
-client.once('ready', () => {
-    console.log(`${client.user.tag} aktif!`);
-});
-
-// Tokeni GitHub'a yazma.
-// DISCORD_TOKEN ortam değişkenine ekle.
-client.login(process.env.DISCORD_TOKEN);
+client.login(token);
