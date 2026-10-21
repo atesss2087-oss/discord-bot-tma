@@ -1,125 +1,102 @@
+const { Client, GatewayIntentBits } = require('discord.js');
+const express = require('express');
 
-const express = require("express");
-const {
-  Client,
-  GatewayIntentBits,
-  PermissionsBitField
-} = require("discord.js");
-const fs = require("node:fs");
-
+// --- 1. RENDER İÇİN EXPRESS SUNUCUSU ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req, res) => {
-  res.status(200).send("Bot is running!");
+app.get('/', (req, res) => {
+    res.send('Bot is running!');
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is listening on port ${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Server is listening on port ${PORT}`);
 });
 
-const token = process.env.DISCORD_TOKEN;
-
-if (!token) {
-  throw new Error("DISCORD_TOKEN ortam değişkeni ayarlanmamış!");
-}
-
-let config;
-
-try {
-  config = JSON.parse(fs.readFileSync("./badwords.json", "utf8"));
-} catch (error) {
-  console.error("badwords.json okunamadı:", error.message);
-  process.exit(1);
-}
-
-const words = Array.isArray(config) ? config : config.words;
-
-if (!Array.isArray(words)) {
-  throw new Error("badwords.json bir dizi veya { words: [] } olmalı.");
-}
-
-function normalize(text) {
-  return text
-    .toLocaleLowerCase("tr-TR")
-    .normalize("NFKC")
-    .replace(/[.,!?;:()[\]{}"'`]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-const badWords = [...new Set(words.map(normalize).filter(Boolean))]
-  .sort((a, b) => b.length - a.length);
-
-function containsBadWord(content) {
-  const text = ` ${normalize(content)} `;
-
-  return badWords.some(word => {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, "u").test(text);
-  });
-}
-
+// --- 2. DİSCORD BOTU AYARLARI ---
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+    ],
 });
 
-client.once("ready", () => {
-  console.log(`Bot çevrimiçi: ${client.user.tag}`);
+// Engellenecek kelimeler listesi
+const badWords = [
+    "amk", "aq", "aw", "mq", "öç", "oc", "oe", "öe", "piç", "pic",
+    "pij", "sik", "sikti", "siktir", "sikim", "sikimden", "sikis",
+    "sikiş", "sokuk", "yarrak", "yarak", "orospu", "orosbu", "pezevenk",
+    "şerefsiz", "serefsiz", "kahpe", "göt", "got", "götveren", "dalyarak",
+    "amcık", "amcik", "ibne", "ipne", "puşt", "pust", "testis", "penis",
+    "vajina", "sperm", "porno", "porn", "seks", "sex", "sikik", "yarram",
+    "ananı", "anani", "ananı sikeyim", "siktigimin", "fahişe", "fahise",
+    "fuck", "shit", "bitch", "ass", "asshole", "bastard", "dick", "cunt",
+    "pussy", "cock", "whore", "slut", "nsfw", "kill yourself", "kys",
+    "sidik", "pipi", "daşşak", "vajna", "tayt", "don"
+];
+
+client.once('clientReady', () => {
+    console.log(`Bot çevrimiçi: ${client.user.tag}`);
 });
 
-client.on("messageCreate", async message => {
-  if (!message.guild || message.author.bot) return;
+// Yeni üye gelince karşılama mesajı
+client.on('guildMemberAdd', (member) => {
+    // Mesajın gönderileceği kanalın ID'sini buraya yazmalısın
+    const kanalId = 'KANAL_ID_BURAYA'; 
+    const kanal = member.guild.channels.cache.get(kanalId);
+    if (kanal) {
+        kanal.send(`Kampımıza hoş geldin reis, ${member}! :blue_heart:`);
+    }
+});
 
-  try {
-    if (containsBadWord(message.content)) {
-      // Mesajı önce silmeyi dene.
-      await message.delete();
+// Mesaj kontrolleri (Küfür, Büyük Harf ve "Sa" yanıtı)
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
 
-      const member = message.member;
-      const me = message.guild.members.me;
+    const content = message.content;
+    const lowerContent = content.toLowerCase();
 
-      if (
-        member &&
-        member.moderatable &&
-        me?.permissions.has(
-          PermissionsBitField.Flags.ModerateMembers
-        )
-      ) {
-        await member.timeout(180_000, "Yasaklı kelime filtresi");
-
-        const warning = await message.channel.send(
-          `⚠️ ${message.author}, yasaklı kelime kullandığın için 3 dakika susturuldun!`
-        );
-
-        setTimeout(() => {
-          warning.delete().catch(() => {});
-        }, 5000);
-      }
-
-      return;
+    // 1. Küfür Filtresi
+    const isBadWord = badWords.some(word => lowerContent.includes(word));
+    if (isBadWord) {
+        try {
+            await message.delete();
+            message.channel.send(`${message.author}, bu kanalda küfür veya yasaklı kelime kullanamazsın!`).then(msg => {
+                setTimeout(() => msg.delete().catch(() => {}), 5000);
+            });
+            return;
+        } catch (err) {
+            console.log("Mesaj silinemedi yetkim yok.");
+        }
     }
 
-    const text = normalize(message.content);
-
-    if (/^sa[!.?]*$/u.test(text)) {
-      await message.reply("Aleyküm selam, hoş geldin reis 💙");
-      return;
+    // 2. Aşırı Büyük Harf Filtresi (Örn: 15 karakterden uzun ve %70'i büyük harfse)
+    if (content.length > 15) {
+        const uppercaseCount = content.replace(/[^A-ZİĞÜŞÖÇ]/g, "").length;
+        if ((uppercaseCount / content.length) > 0.7) {
+            try {
+                await message.delete();
+                message.channel.send(`${message.author}, lütfen büyük harf bağırmarak yazma!`).then(msg => {
+                    setTimeout(() => msg.delete().catch(() => {}), 5000);
+                });
+                return;
+            } catch (err) {
+                console.log("Büyük harf mesajı silinemedi.");
+            }
+        }
     }
 
-    if (/\b(napıyonuz|napıypnuz|napıyorsunuz)\b/u.test(text)) {
-      await message.reply("İyi senden naber reis 😎");
+    // 3. "Sa" yazınca yanıt verme
+    if (lowerContent === 'sa' || lowerContent === 'selamün aleyküm' || lowerContent === 'selamun aleykum') {
+        message.reply('Aleykümselam, hoş geldin reis :blue_heart:');
     }
-  } catch (error) {
-    console.error("Mesaj işleme hatası:", error);
-  }
+    
+    if (lowerContent === 'napiyonuz' || lowerContent === 'napıyonuz') {
+        message.reply('İyi senden naber reis :sunglasses:');
+    }
 });
 
-client.login(token).catch(error => {
-  console.error("Discord bağlantı hatası:", error);
-  process.exit(1);
-});
+// Botunun token değerini buraya yapıştıracaksın
+client.login('SENIN_BOT_TOKENIN');
