@@ -44,32 +44,35 @@ const userLevels = new Map();
 
 // Yetkili Rol ID'si (Bu rol ve üstü komut kullanabilir)
 const YETKILI_ROL_ID = '1533059872655151116';
+const ROBLOX_OYUN_LINKI = 'https://www.roblox.com/tr/games/80024713565142/TMA-T-rk-Asker-Oyunu';
 
 client.once('ready', async () => {
     console.log(`Bot çevrimiçi: ${client.user.tag}`);
 
-    // Tüm Slash (/) komutlarını Discord'a kaydetme
+    // Slash (/) komutlarını Discord'a kaydetme
     const commands = [
         new SlashCommandBuilder().setName('bilet').setDescription('Destek talebi (bilet) menüsünü açar.'),
-        new SlashCommandBuilder().setName('rütbever').setDescription('Bir üyeye rütbe (rol) verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbeal').setDescription('Bir üyeden rütbe (rol) alır.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol alınacak üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Alınacak rol').setRequired(true)),
-        new SlashCommandBuilder().setName('tam-yasakla').setDescription('Kullanıcıyı bu kampın ana veritabanından tamamen yasaklar.').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)),
-        new SlashCommandBuilder().setName('yenile').setDescription('Roblox verilerini RoWifi üzerinden yeniler.'),
-        new SlashCommandBuilder().setName('oyun-yasak-kaldır').setDescription('Belirtilen kullanıcının oyun yasaklı durumunu kaldırır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('rütbever').setDescription('Bir üyeye rütbe verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
+        new SlashCommandBuilder().setName('rütbeal').setDescription('Bir üyeden rütbe alır.').addUserOption(opt => opt.setName('kullanici').setDescription('Rol alınacak üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Alınacak rol').setRequired(true)),
+        new SlashCommandBuilder().setName('tam-yasakla').setDescription('Kullanıcıyı veritabanından tamamen yasaklar.').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)),
+        new SlashCommandBuilder().setName('yenile').setDescription('Roblox verilerini yeniler.'),
+        new SlashCommandBuilder().setName('oyun-yasak-kaldır').setDescription('Kullanıcının oyun yasağını kaldırır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('oyun-yasak-sorgu').setDescription('Kullanıcının oyun yasak durumunu sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('karaliste-rol-çıkar').setDescription('[Sadece Yönetici] Bir rolün karalisteden çıkmasını sağlar.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
-        new SlashCommandBuilder().setName('karaliste-rol-ekle').setDescription('[Sadece Yönetici] Kara listeye rol ekler.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
-        new SlashCommandBuilder().setName('karaliste-çıkar').setDescription('Bir kullanıcıyı kara listeden çıkarır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('karaliste-ekle').setDescription('Bir kullanıcıyı kara listeye ekler.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-tam-at').setDescription('Kullanıcıyı bulunduğu tüm branşlardan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('gamepass-sorgu').setDescription('Kullanıcının seçilen Gamepass durumunu sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-terfi').setDescription('Branşta bir üst rütbeye terfi ettirir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-ver').setDescription('Kullanıcıya seçilen branşta rütbe verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-at').setDescription('Kullanıcıyı seçtiğin branştan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('karaliste-rol-çıkar').setDescription('Bir rolün karalisteden çıkmasını sağlar.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
+        new SlashCommandBuilder().setName('karaliste-rol-ekle').setDescription('Kara listeye rol ekler.').addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
+        new SlashCommandBuilder().setName('karaliste-çıkar').setDescription('Kullanıcıyı kara listeden çıkarır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('karaliste-ekle').setDescription('Kullanıcıyı kara listeye ekler.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('branş-tam-at').setDescription('Kullanıcıyı tüm branşlardan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('gamepass-sorgu').setDescription('Gamepass durumunu sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('branş-rütbe-terfi').setDescription('Branşta terfi ettirir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('branş-rütbe-ver').setDescription('Branşta rütbe verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('branş-at').setDescription('Kullanıcıyı branştan atar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
         new SlashCommandBuilder().setName('branş-istek').setDescription('Branş isteğini yönetir.'),
         new SlashCommandBuilder().setName('branş-rütbe-rd').setDescription('Branşta rütbe düşürür.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('branş-rütbe-sorgu').setDescription('Kullanıcının branş rütbesini sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('bilgi').setDescription('Botun istatistiklerini ve detaylarını gösterir.')
+        new SlashCommandBuilder().setName('branş-rütbe-sorgu').setDescription('Branş rütbesini sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
+        new SlashCommandBuilder().setName('bilgi').setDescription('Botun istatistiklerini gösterir.'),
+        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyununun aktiflik durumunu gösterir.'),
+        new SlashCommandBuilder().setName('aktiflik-çağrı').setDescription('Tüm personelleri oyuna davet etmek için çağrı başlatır.')
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
@@ -184,14 +187,50 @@ client.on('interactionCreate', async (interaction) => {
 
         if (commandName === 'bilet') {
             const embed = new EmbedBuilder()
-                .setTitle('TMA | Türkiye Harp Okulu')
-                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butonuna tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe, branş üyeliği alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönemk İçin Bu Bileti Kullana Bilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kulana Bilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
+                .setTitle('Türkiye Harp Okulu - Destek Sistemi')
+                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki butona tıklayarak bir destek talebi oluşturabilirsiniz. Talebiniz en kısa sürede ekibimiz tarafından yanıtlanacaktır.\n\n**Bilet Kategorileri**\n\n🛡️ **Moderatör Bileti**\nDiscord ile ilgili yaşanan sorunlar ve yardım talepleri için bu bileti seç.\n\n⚖️ **Reklam Destek Bileti**\nDiscord veya Oyun üzerinde reklam yapan insanları şikayet edebilmek için bu bilet türünü seç.\n\n🪙 **Gamepass Bileti**\nRobux ile rütbe, branş üyeliği alımında bu bilet türünü seç.\n\n⬛ **Oyun Destek Bileti**\nOyunumuzda yaşanan sorunlar hakkında yardım almak için bu bileti seç.\n\n🎖️ **Geri Dönüş Bileti**\nKampa Geri Dönmek İçin Bu Bileti Kullanabilirsiniz\n\n🌐 **Transfer Bileti**\nTransfer Olmak İçin Bu Ticketi Kullanabilirsiniz\n\n👥 **Rütbe Destek Bileti**\nRütbeniz hakkında yaşanan sorunlar hakkında yardım almak için bu bileti seç.(Rütbem Gitti)')
                 .setColor(0x2f3136);
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder().setCustomId('create_ticket').setLabel('Destek Talebi Oluştur').setStyle(ButtonStyle.Secondary).setEmoji('🎫')
             );
             return interaction.reply({ embeds: [embed], components: [row] });
+        }
+
+        if (commandName === 'aktiflik-sorgu') {
+            const embed = new EmbedBuilder()
+                .setTitle('🎮 Türkiye Harp Okulu - Oyun Aktiflik Durumu')
+                .setDescription('Sunucumuzun ana Roblox oyununun güncel durumunu aşağıdaki butona tıklayarak inceleyebilir ve oyuna giriş yapabilirsiniz!')
+                .setColor(0x00FF00);
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setStyle(ButtonStyle.Link)
+                    .setLabel('Oyuna Git / Aktifliği Gör')
+                    .setURL(ROBLOX_OYUN_LINKI)
+                    .setEmoji('🔗')
+            );
+
+            return interaction.reply({ embeds: [embed], components: [row] });
+        }
+
+        if (commandName === 'aktiflik-çağrı') {
+            const embed = new EmbedBuilder()
+                .setTitle('🚨 OYUN AKTİFLİK ÇAĞRISI!')
+                .setDescription(`Tüm TMA personelleri oyuna davet ediliyor! Seriler, eğitimler ve aktiflik için herkes sunucuya bekleniyor.\n\n📌 **Çağrıyı Yapan Yetkili:** ${interaction.user}`)
+                .setColor(0xFF0000);
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setStyle(ButtonStyle.Link)
+                    .setLabel('Oyuna Katıl')
+                    .setURL(ROBLOX_OYUN_LINKI)
+                    .setEmoji('🚀')
+            );
+
+            // Kanalda doğrudan @everyone ile mesaj gönderme
+            await interaction.channel.send({ content: '@everyone', embeds: [embed], components: [row] });
+            return interaction.reply({ content: 'Aktiflik çağrısı başarıyla gönderildi!', ephemeral: true });
         }
 
         if (commandName === 'rütbever') {
