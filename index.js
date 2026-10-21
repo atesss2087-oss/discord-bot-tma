@@ -99,4 +99,5 @@ client.on('messageCreate', async (message) => {
 });
 
 // Botunun token değerini buraya yapıştıracaksın
-client.login('SENIN_BOT_TOKENIN');
+client.login(process.env.DISCORD_TOKEN);
+
