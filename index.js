@@ -1,8 +1,7 @@
-```javascript
 const { Client, GatewayIntentBits } = require('discord.js');
 const http = require('http');
 
-// Render'ın uykuya geçmesini önleyen mini web sunucusu
+// Render'in uykuya geçmesini önleyen mini web sunucusu
 http.createServer((req, res) => {
   res.write("Bot 7/24 Aktif!");
   res.end();
