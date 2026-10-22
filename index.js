@@ -94,7 +94,7 @@ client.on('messageCreate', async (message) => {
     const userId = message.author.id;
     const lowerContent = message.content.toLowerCase();
 
-    // 1. Spam koruması
+    // 1. Spam / Ard arda mesaj koruması
     if (message.member && !message.member.permissions.has('Administrator')) {
         const now = Date.now();
         if (!userMessageMap.has(userId)) userMessageMap.set(userId, []);
@@ -114,12 +114,28 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // 2. Küfür filtresi (Sabit geniş liste)
+    // 2. Fotoğraftaki tam liste küfür ve uygunsuz içerik filtresi
     const badWords = [
-        "amk", "aq", "aw", "mq", "hdabla", "sik", "sikti", "siktir", "sikim", "sokuk", 
-        "yarrak", "yarak", "orospu", "orosbu", "pezevenk", "şerefsiz", "kahpe", 
-        "göt", "got", "ibne", "ipne", "puşt", "pust", "mal", "porno", "porn", 
-        "sex", "seks", "31", "sidik", "meme", "göğüs", "ananı", "anani"
+        "amk", "aq", "aw", "mq", "oç", "oc", "oe", "öe", "piç", "pic",
+        "pij", "sik", "sikti", "siktir", "sikim", "sikimden", "sikis",
+        "sikiş", "sokuk", "yarrak", "yarak", "yarak kafalı", "orospu", "orosbu", 
+        "pezevenk", "p3z3v3nk", "şerefsiz", "serefsiz", "kahpe", "göt", "got", 
+        "götveren", "gotveren", "dalyarak", "amcık", "amcik", "ibne", "ipne", 
+        "puşt", "pust", "testis", "penis", "vajina", "vajna", "sperm", "porno", "porn",
+        "pornhub", "xvideos", "xnxx", "hentai", "seks", "sex", "doggy", "69", "31", 
+        "mastürbasyon", "sidik", "sıçmak", "sicmak", "sıçtım", "sictim", "ossurdum", 
+        "osurdum", "kaka", "balgam", "pipi", "daşşak", "dassak", "steroid", "alkol", 
+        "sigara", "vape", "uyuşturucu", "öldururum", "oldururum", "gebertirim", 
+        "vururum", "keserim", "kafası yerde", "hdabla", "ifşa", "annen", "anne", 
+        "star", "bebeğim", "bebegim", "gülüm", "gulum", "mahrem", "tayt", "crop", 
+        "don", "çete", "cete", "dalton", "meme", "göğüs", "gogus", "üvey kızkardeş", 
+        "uvey kizkardes", "turuncusite", "silah", "yavşak", "yavsak", "top", "kancık", 
+        "kancik", "amina", "sikem", "sikiyim", "sikerim", "orospu çocuğu", "sik kafalı", 
+        "yarram", "götünü", "sikik", "got deliği", "ammcik", "kahbenin evladı", 
+        "picin evladı", "siktiğimin", "amk veledi", "ananı", "anani", "ananı sikeyim", 
+        "ananı sikim", "bacını", "bacini", "sülaleni", "avradını", "ezik", "fuck", 
+        "fucking", "fucker", "motherfucker", "shit", "bitch", "ass", "asshole", 
+        "bastard", "dick", "cunt", "pussy", "cock", "whore", "slut", "mal"
     ];
 
     const swearWordsSet = FuzzySet(badWords);
@@ -150,7 +166,6 @@ client.on('messageCreate', async (message) => {
                 await message.member.timeout(3 * 60 * 1000, "Küfür koruması");
             }
 
-            // Sadece o kişiye özel geçici uyarı mesajı (Ephemeral benzeri silinebilir uyarı)
             const warningMsg = await message.channel.send(`${message.author}, uygunsuz kelime kullandığın için mesajın silindi ve 3 dakika susturuldun! 🛑`);
             setTimeout(() => warningMsg.delete().catch(() => {}), 4000);
         } catch (err) {
