@@ -73,12 +73,6 @@ const securityMessageMap = new Map();
 const securityCommandMap = new Map();
 const guildSecurityStatus = new Map();
 
-function isSecurityStaff(member) {
-    if (!member || !member.permissions) return false;
-    if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
-    return [YETKILI_ROL_ID, ANA_YETKILI_ROL_1, ANA_YETKILI_ROL_2].some(roleId => member.roles.cache.has(roleId));
-}
-
 function canUseCommand(userId, commandName, cooldownMs) {
     const key = `${userId}:${commandName}`;
     const now = Date.now();
@@ -183,44 +177,44 @@ client.on("messageCreate", async (message) => {
     const member = message.member;
     const userId = message.author.id;
 
-    if (!isSecurityStaff(member)) {
-        const now = Date.now();
-        const key = `${message.guild.id}:${userId}`;
-        let entry = securityMessageMap.get(key);
+    // SPAM KORUMASI (Artık kurucu dahil herkesi test için filtreler)
+    const now = Date.now();
+    const key = `${message.guild.id}:${userId}`;
+    let entry = securityMessageMap.get(key);
 
-        if (!entry || now - entry.windowStart >= SECURITY.MESSAGE_WINDOW_MS) {
-            entry = { windowStart: now, count: 0, lastSeen: now };
-        }
-
-        entry.count++;
-        entry.lastSeen = now;
-        securityMessageMap.set(key, entry);
-
-        if (entry.count > SECURITY.MAX_MESSAGES_PER_WINDOW) {
-            try {
-                if (message.deletable) await message.delete();
-                if (member.moderatable) {
-                    await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA otomatik spam koruması");
-                }
-
-                const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
-                if (logChannel) {
-                    const embed = new EmbedBuilder()
-                        .setColor(0xFFA500)
-                        .setTitle('⚡ Spam Tespit Edildi!')
-                        .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n3 saniyede 3+ mesaj attığı için susturuldu.`)
-                        .setTimestamp();
-                    await logChannel.send({ embeds: [embed] });
-                }
-            } catch (error) { console.error("Spam koruması:", error.message); }
-            return;
-        }
+    if (!entry || now - entry.windowStart >= SECURITY.MESSAGE_WINDOW_MS) {
+        entry = { windowStart: now, count: 0, lastSeen: now };
     }
 
+    entry.count++;
+    entry.lastSeen = now;
+    securityMessageMap.set(key, entry);
+
+    if (entry.count > SECURITY.MAX_MESSAGES_PER_WINDOW) {
+        try {
+            if (message.deletable) await message.delete();
+            if (member.moderatable) {
+                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA otomatik spam koruması");
+            }
+
+            const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+            if (logChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor(0xFFA500)
+                    .setTitle('⚡ Spam Tespit Edildi!')
+                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n3 saniyede 3+ mesaj attığı için susturuldu.`)
+                    .setTimestamp();
+                await logChannel.send({ embeds: [embed] });
+            }
+        } catch (error) { console.error("Spam koruması:", error.message); }
+        return;
+    }
+
+    // KÜFÜR FİLTRESİ (Artık herkesi filtreler)
     const normalizedContent = normalizeText(message.content);
     const küfürBulundu = normalizedBadWords.some(word => (` ${normalizedContent} `).includes(` ${word} `));
 
-    if (küfürBulundu && !isSecurityStaff(member)) {
+    if (küfürBulundu) {
         try {
             if (message.deletable) await message.delete();
             if (member.moderatable) {
@@ -293,7 +287,7 @@ client.on('guildMemberAdd', async (member) => {
                 const embed = new EmbedBuilder()
                     .setColor(0xFFA500)
                     .setTitle('⚠️ Şüpheli Yeni Hesap Tespit Edildi!')
-                    .setDescription(`**Üye:** ${member.user.tag} (${member})\n**Hesap Yaşı:** ${Math.floor(hesapYasiGun)} gün önce açılmış.`)
+                    .setDescription(`**Üye:** ${message.author.tag} (${member})\n**Hesap Yaşı:** ${Math.floor(hesapYasiGun)} gün önce açılmış.`)
                     .setTimestamp();
                 await logChannel.send({ embeds: [embed] });
             }
