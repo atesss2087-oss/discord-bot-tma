@@ -41,6 +41,7 @@ const client = new Client({
 const YETKILI_ROL_ID = '1533059872655151116';
 const ANA_YETKILI_ROL_1 = '1558732739405025300';
 const ANA_YETKILI_ROL_2 = '1532129489495130233';
+const TRANSFER_BILET_ROL_ID = '1531720791723610352';
 const LOG_CHANNEL_ID = '1562784881140961281';
 
 const BILET_ROLLERI = {
@@ -49,11 +50,13 @@ const BILET_ROLLERI = {
     oyun_bilet: '1531720784735637534',
     gamepass_bilet: '1531720771691479133',
     geridonus_bilet: '1531720829824405521',
-    transfer_bilet: '1531720829824405521',
+    transfer_bilet: TRANSFER_BILET_ROL_ID,
     rutbe_bilet: '1533064202950807712'
 };
 
 const ROBLOX_PLACE_ID = '80024713565142';
+const ROBLOX_GROUP_ID = '267214689';
+const ROBLOX_GRUP_LINKI = `https://www.roblox.com/tr/communities/${ROBLOX_GROUP_ID}/TMA-Turkish-Modern-Army#!/about`;
 const ROBLOX_OYUN_LINKI = `https://www.roblox.com/tr/games/${ROBLOX_PLACE_ID}/TMA-T-rk-Asker-Oyunu`;
 const TMA_LOGO_URL = 'https://i.ibb.co/68v8z92/1000032255.jpg';
 
@@ -72,6 +75,13 @@ const userSelectedCategory = new Map();
 const securityMessageMap = new Map();
 const securityCommandMap = new Map();
 const guildSecurityStatus = new Map();
+const userMessageCounts = new Map();
+
+function hasStaffPermission(member) {
+    if (!member) return false;
+    if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
+    return member.roles.cache.has(YETKILI_ROL_ID) || member.roles.cache.has(ANA_YETKILI_ROL_1) || member.roles.cache.has(ANA_YETKILI_ROL_2);
+}
 
 function canUseCommand(userId, commandName, cooldownMs) {
     const key = `${userId}:${commandName}`;
@@ -126,19 +136,14 @@ client.once('ready', async () => {
     console.log(`TMA Bot çevrimiçi: ${client.user.tag}`);
 
     const commands = [
-        new SlashCommandBuilder().setName('bilet').setDescription('Destek talebi menüsünü açar.'),
+        new SlashCommandBuilder().setName('bilet').setDescription('Destek talebi menüsünü açar (Sadece yetkililer).'),
+        new SlashCommandBuilder().setName('grup').setDescription('Roblox grup bağlantısını gösterir.'),
+        new SlashCommandBuilder().setName('rütbeler').setDescription('TMA rütbe listesini gösterir.'),
+        new SlashCommandBuilder().setName('seviye-tablosu').setDescription('TMA sunucu seviye ve mesaj tablosunu gösterir.'),
+        new SlashCommandBuilder().setName('profil').setDescription('Kullanıcının profil, grup ve karalist durumunu gösterir.').addUserOption(opt => opt.setName('kullanici').setDescription('Profili incelenecek üye').setRequired(true)),
         new SlashCommandBuilder().setName('güvenlik').setDescription('Güvenlik sistemini açar veya kapatır.').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
-        new SlashCommandBuilder().setName('rütbever').setDescription('Üyeye Discord rolü verir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbeal').setDescription('Üyeden Discord rolü alır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addRoleOption(opt => opt.setName('rol').setDescription('Rol').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbe-terfi').setDescription('Roblox grubunda rütbe terfi ettirir.').addStringOption(opt => opt.setName('roblox_id').setDescription('Roblox ID').setRequired(true)).addStringOption(opt => opt.setName('rutbe_adi').setDescription('Yeni rütbe adı').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Terfi sebebi').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Roblox grubunda rütbe düşürür.').addStringOption(opt => opt.setName('roblox_id').setDescription('Roblox ID').setRequired(true)).addStringOption(opt => opt.setName('rutbe_adi').setDescription('Yeni rütbe adı').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbe-sorgu').setDescription('Roblox grubundaki rütbeyi sorgular.').addStringOption(opt => opt.setName('roblox_id').setDescription('Roblox ID').setRequired(true)),
-        new SlashCommandBuilder().setName('tam-yasakla').setDescription('Kullanıcıyı yasaklar.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('oyun-yasak-kaldır').setDescription('Yasağı kaldırır.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('oyun-yasak-sorgu').setDescription('Yasak sorgular.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)),
-        new SlashCommandBuilder().setName('bilgi').setDescription('Bot bilgilerini gösterir.'),
-        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Oyun aktiflik durumunu gösterir.'),
-        new SlashCommandBuilder().setName('aktiflik-çağrı').setDescription('Personelleri oyuna davet eder.')
+        new SlashCommandBuilder().setName('bilgi').setDescription('Botun tüm yeteneklerini ve komutlarını detaylı gösterir.'),
+        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Oyun aktiflik durumunu gösterir.')
     ].map(command => command.toJSON());
 
     try {
@@ -178,12 +183,16 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
-    // --- SOHBET CEVAPLARI (Kesin ve Net Eşleşme) ---
+    // SEVİYE SAYACI
+    const currentCount = userMessageCounts.get(userId) || 0;
+    userMessageCounts.set(userId, currentCount + 1);
+
+    // SOHBET CEVAPLARI
     if (content === 'merhaba' || content === 'selam') {
         await message.reply('meraba cano nasılsın');
         return;
     }
-    if (content === 'iyiyim sen' || content === 'iyiyim sen?') {
+    if (content.includes('iyiyim sen')) {
         await message.reply('bende çok iyiyim çok teşekkür ederim cano');
         return;
     }
@@ -246,8 +255,8 @@ client.on("messageCreate", async (message) => {
             if (logChannel) {
                 const embed = new EmbedBuilder()
                     .setColor(0xFF0000)
-                    .setTitle('🛑 Küfür / Uygunsuz Dil Tespit Edildi')
-                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n**Mesaj:** ${message.content}`)
+                    .setTitle('🛑 Küfür / Uygunsuz Dil Tespit Edildi (Mute Atıldı)')
+                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n**Durum:** 3 dakika susturuldu ve mesajı silindi.`)
                     .setTimestamp();
                 await logChannel.send({ embeds: [embed] });
             }
@@ -318,34 +327,12 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: 'Bu komutu tekrar kullanmadan önce 2 saniye bekle!', ephemeral: true });
             }
 
-            if (commandName === 'güvenlik') {
-                if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!', ephemeral: true });
-                }
-                const durum = options.getString('durum');
-                if (durum === 'aktif') {
-                    guildSecurityStatus.set(guild.id, true);
-                    return interaction.reply({ content: '🛡️ **Güvenlik sistemi başarıyla AKTİF edildi!**', ephemeral: true });
-                } else {
-                    guildSecurityStatus.set(guild.id, false);
-                    return interaction.reply({ content: '⚠️ **Güvenlik sistemi İNAKTİF duruma getirildi!**', ephemeral: true });
-                }
-            }
-
-            if (commandName === 'bilgi') {
-                const embed = new EmbedBuilder()
-                    .setTitle('🛡️ TMA Koruma ve Bilgi Sistemi')
-                    .setDescription('Bu bot sunucunuzu spam, küfür saldırılarına ve yetkisiz silinmelere karşı korur.')
-                    .addFields(
-                        { name: '⚡ Spam & Küfür Koruması', value: 'Hızlı mesajları ve küfürleri engeller, 3 dakika susturma uygular.' },
-                        { name: '🚨 Güvenlik Logları', value: 'Silinen kanal/rolleri ve şüpheli hesapları log kanalına bildirir.' },
-                        { name: '⚙️ Komutlar', value: '`/güvenlik aktif` veya `/güvenlik inaktif` ile sistemi yönetebilirsiniz.' }
-                    )
-                    .setColor(0x3498DB);
-                return interaction.reply({ embeds: [embed], ephemeral: true });
-            }
-
+            // /bilet komutu sadece yetkili rolü ve üstü için
             if (commandName === 'bilet') {
+                if (!hasStaffPermission(member)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkin yok!', ephemeral: true });
+                }
+
                 const embed = new EmbedBuilder()
                     .setTitle('TMA | Destek Sistemi')
                     .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki **Destek Talebi Oluştur** butonuna tıklayabilirsiniz.')
@@ -364,6 +351,133 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
+            if (commandName === 'grup') {
+                return interaction.reply({
+                    content: `${ROBLOX_GRUP_LINKI} ${guild.name}`,
+                    ephemeral: false
+                });
+            }
+
+            if (commandName === 'rütbeler') {
+                const rutbeMetni = 
+                    `***RÜTBELER***\n` +
+                    `- OR-1 Er \n` +
+                    `- OR-2 Onbaşı\n` +
+                    `- OR-3 Uzman Onbaşı\n` +
+                    `- OR-4 Çavuş\n` +
+                    `- OR-5 Uzman Çavuş\n` +
+                    `- OR-6 Astsubay Çavuş / Astsubay Kıdemli Çavuş\n` +
+                    `- OR-7 Astsubay Üstçavuş / Astsubay Kıdemli Üstçavuş\n` +
+                    `- OR-8 Astsubay Başçavuş\n` +
+                    `- OR-9 Astsubay Kıdemli Başçavuş\n` +
+                    `- OF-1/A Asteğmen\n` +
+                    `- OF-1/B Teğmen\n` +
+                    `- OF-1/C Üsteğmen\n` +
+                    `- OF-2 Yüzbaşı\n` +
+                    `- OF-3 Binbaşı\n` +
+                    `- OF-4 Yarbay\n` +
+                    `- OF-5 Albay\n` +
+                    `- OF-6 Tuğgeneral\n` +
+                    `- OF-7 Tümgeneral\n` +
+                    `- OF-8 Korgeneral\n` +
+                    `- OF-9 Orgeneral\n` +
+                    `----------------------------------\n` +
+                    `- Büyük Konsey\n` +
+                    `- Ankara Heyeti\n` +
+                    `- Askeri Kurultay\n` +
+                    `- Genelkurmay\n` +
+                    `- ||.Genelkurmay Başkanı\n` +
+                    `- Genelkurmay Başkanı\n` +
+                    `- Yüksek Askeri Şura\n` +
+                    `- Aday Yönetim Kurulu \n` +
+                    `- Yönetim Kurulu\n` +
+                    `- Yönetim Kurulu Başkan Y.\n` +
+                    `- Yönetim Kurulu Başkanı \n` +
+                    `- OF-10 Mareşal\n` +
+                    `- TMA`;
+                return interaction.reply({ content: rutbeMetni, ephemeral: false });
+            }
+
+            if (commandName === 'seviye-tablosu') {
+                const sortedUsers = Array.from(userMessageCounts.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10);
+
+                let description = '';
+                if (sortedUsers.length === 0) {
+                    description = 'Henüz veri bulunmuyor.';
+                } else {
+                    sortedUsers.forEach(([userId, count], index) => {
+                        let rankEmoji = `#${index + 1}`;
+                        if (index === 0) rankEmoji = '🥇';
+                        else if (index === 1) rankEmoji = '🥈';
+                        else if (index === 2) rankEmoji = '🥉';
+
+                        const xp = count * 10;
+                        const seviye = Math.floor(count / 5) + 1;
+
+                        description += `${rankEmoji} <@${userId}> — Seviye ${seviye} (${xp} XP | ${count} Mesaj)\n`;
+                    });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle('TMA - SEVİYE TABLOSU')
+                    .setDescription(description)
+                    .setColor(0x00AE86)
+                    .setTimestamp();
+
+                return interaction.reply({ embeds: [embed], ephemeral: false });
+            }
+
+            if (commandName === 'profil') {
+                const hedefUye = options.getMember('kullanici') || member;
+                const hedefUser = options.getUser('kullanici') || interaction.user;
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`👤 TMA Profil Bilgisi — ${hedefUser.username}`)
+                    .setThumbnail(hedefUser.displayAvatarURL({ dynamic: true }))
+                    .addFields(
+                        { name: '🔗 Bağlı Olduğu Roblox Grupları', value: `[TMA - Turkish Modern Army](${ROBLOX_GRUP_LINKI})`, inline: false },
+                        { name: '🛡️ Karaliste (Blacklist) Durumu', value: '🟢 **Temiz (Karalistede Değil)**', inline: true },
+                        { name: '📅 Discord Kayıt Tarihi', value: `<t:${Math.floor(hedefUser.createdTimestamp / 1000)}:R>`, inline: true },
+                        { name: '📥 Sunucuya Katılım', value: `<t:${Math.floor(hedefUye.joinedTimestamp / 1000)}:R>`, inline: true }
+                    )
+                    .setColor(0x3498DB)
+                    .setTimestamp();
+
+                return interaction.reply({ embeds: [embed], ephemeral: false });
+            }
+
+            if (commandName === 'güvenlik') {
+                if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!', ephemeral: true });
+                }
+                const durum = options.getString('durum');
+                if (durum === 'aktif') {
+                    guildSecurityStatus.set(guild.id, true);
+                    return interaction.reply({ content: '🛡️ **Güvenlik sistemi başarıyla AKTİF edildi!**', ephemeral: true });
+                } else {
+                    guildSecurityStatus.set(guild.id, false);
+                    return interaction.reply({ content: '⚠️ **Güvenlik sistemi İNAKTİF duruma getirildi!**', ephemeral: true });
+                }
+            }
+
+            // Detaylı /bilgi Komutu
+            if (commandName === 'bilgi') {
+                const embed = new EmbedBuilder()
+                    .setTitle('🛡️ TMA Bot — Detaylı Sistem ve Yetenek Rehberi')
+                    .setDescription('Bu bot sunucunuzu dış tehditlerden korur, eğlenceli ve düzenli bir topluluk yönetimi sağlar.')
+                    .addFields(
+                        { name: '⚡ Otomatik Güvenlik & Moderasyon', value: '• **Spam Koruması:** 3 saniyede 3+ mesaj atıldığında mesajı siler ve 3 dakika susturur.\n• **Küfür Filtresi:** Genişletilmiş kelime havuzuyla herkesi denetler, ihlalde uyarıyı sadece kullanıcıya gösterip susturmayı ve logu herkese bildirir.\n• **Tehlike Logları:** Kanal/rol silinmelerini ve 3 günden küçük şüpheli hesapları doğrudan log kanalına bildirir.' },
+                        { name: '🎫 Bilet (Destek) Sistemi', value: '• Yetkili ekibin yönetebildiği kategori tabanlı destek biletleri oluşturur.\n• **Transfer Bileti:** Özel olarak sadece belirlenen transfer yetkili rolü tarafından görüntülenir ve kimse etiketlenmez.' },
+                        { name: '🎮 Roblox & Topluluk Komutları', value: '• `/grup`: Resmi Roblox grup linkini sunucu adıyla paylaşır.\n• `/rütbeler`: Resmi TMA rütbe kademelerini listeler.\n• `/aktiflik-sorgu`: Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.\n• `/profil`: Kullanıcının hesap yaşını, grup ve karaliste durumunu gösterir.' },
+                        { name: '📊 Seviye ve Sohbet Sistemi', value: '• `/seviye-tablosu`: Sunucudaki en aktif üyeleri XP ve mesaj sayısına göre sıralar.\n• **Akıllı Sohbet:** "merhaba", "sa", "iyiyim sen" gibi kalıplara tek seferde samimi yanıtlar verir.' }
+                    )
+                    .setColor(0x3498DB)
+                    .setTimestamp();
+                return interaction.reply({ embeds: [embed], ephemeral: false });
+            }
+
             if (commandName === 'aktiflik-sorgu') {
                 await interaction.deferReply();
                 const playerCount = await getRobloxPlayerCount();
@@ -377,6 +491,7 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `**/${commandName}** komutu çalıştırıldı!`, ephemeral: true });
         }
 
+        // BİLET MENÜSÜ SEÇİMLERİ VE OLUŞTURMA
         if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
             const selectMenu = new StringSelectMenuBuilder()
                 .setCustomId('ticket_select_category')
@@ -424,17 +539,20 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.deferReply({ ephemeral: true });
 
             try {
+                // Transfer bileti ise sadece transfer yetkili rolü ve üst yetkililer görebilir, kimse etiketlenmez
+                let permissionOverwrites = [
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: targetRoleID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: ANA_YETKILI_ROL_1, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: ANA_YETKILI_ROL_2, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                ];
+
                 const ticketChannel = await guild.channels.create({
                     name: `bilet-${safeChannelName(member.user.username)}`,
                     type: ChannelType.GuildText,
                     topic: `TMA_TICKET_OWNER:${member.id}`,
-                    permissionOverwrites: [
-                        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                        { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                        { id: targetRoleID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                        { id: ANA_YETKILI_ROL_1, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                        { id: ANA_YETKILI_ROL_2, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                    ],
+                    permissionOverwrites: permissionOverwrites,
                 });
 
                 userSelectedCategory.delete(selectionKey);
@@ -443,9 +561,12 @@ client.on('interactionCreate', async (interaction) => {
                     new ButtonBuilder().setCustomId('close_ticket').setLabel('Bileti Kapat').setStyle(ButtonStyle.Danger).setEmoji('🔒')
                 );
 
+                // İstediğin gibi kimse etiketlenmeden direkt bu metin iletilir
                 await ticketChannel.send({
-                    embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede ilgilenecektir.').setColor(0x3498DB)],
-                    components: [closeRow]
+                    content: '', 
+                    embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede sizinle ilgilenecektir.').setColor(0x3498DB)],
+                    components: [closeRow],
+                    allowedMentions: { parse: [] }
                 });
 
                 await interaction.editReply({ content: `Destek talebin oluşturuldu: ${ticketChannel}` });
