@@ -178,17 +178,17 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = message.content.trim().toLowerCase();
 
-    // --- SOHBET CEVAPLARI (Tek ve net yanıt) ---
+    // --- SOHBET CEVAPLARI (Tek ve Kesin Yanıt) ---
     if (content === 'merhaba' || content === 'selam') {
-        await message.channel.send('meraba cano nasılsın');
+        await message.channel.send({ content: 'meraba cano nasılsın' });
         return;
     }
     if (content === 'iyiyim sen' || content === 'iyiyim sen?') {
-        await message.channel.send('bende çok iyiyim çok teşekkür ederim cano');
+        await message.channel.send({ content: 'bende çok iyiyim çok teşekkür ederim cano' });
         return;
     }
     if (content === 'sa' || content === 's.a.') {
-        await message.channel.send('as cano hoş geldin');
+        await message.channel.send({ content: 'as cano hoş geldin' });
         return;
     }
 
