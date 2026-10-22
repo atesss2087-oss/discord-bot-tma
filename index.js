@@ -613,7 +613,7 @@ client.on('interactionCreate', async (interaction) => {
 
                 await ticketChannel.send({
                     content: '', 
-                    embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede sizinle ilgilenecektir.').setColor(0x3498DB)],
+                    embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede ilgilenecektir.').setColor(0x3498DB)],
                     components: [closeRow],
                     allowedMentions: { parse: [] }
                 });
