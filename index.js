@@ -176,8 +176,20 @@ client.on("messageCreate", async (message) => {
 
     const member = message.member;
     const userId = message.author.id;
+    const content = message.content.trim().toLowerCase();
 
-    // SPAM KORUMASI (Artık kurucu dahil herkesi test için filtreler)
+    // --- SOHBET CEVAPLARI ---
+    if (content === 'merhaba' || content === 'selam') {
+        return message.reply('meraba cano nasılsın');
+    }
+    if (content === 'iyiyim sen' || content === 'iyiyim sen?') {
+        return message.reply('bende çok iyiyim çok teşekkür ederim cano');
+    }
+    if (content === 'sa' || content === 's.a.') {
+        return message.reply('as cano hoş geldin');
+    }
+
+    // SPAM KORUMASI
     const now = Date.now();
     const key = `${message.guild.id}:${userId}`;
     let entry = securityMessageMap.get(key);
@@ -210,7 +222,7 @@ client.on("messageCreate", async (message) => {
         return;
     }
 
-    // KÜFÜR FİLTRESİ (Artık herkesi filtreler)
+    // KÜFÜR FİLTRESİ
     const normalizedContent = normalizeText(message.content);
     const küfürBulundu = normalizedBadWords.some(word => (` ${normalizedContent} `).includes(` ${word} `));
 
@@ -287,7 +299,7 @@ client.on('guildMemberAdd', async (member) => {
                 const embed = new EmbedBuilder()
                     .setColor(0xFFA500)
                     .setTitle('⚠️ Şüpheli Yeni Hesap Tespit Edildi!')
-                    .setDescription(`**Üye:** ${message.author.tag} (${member})\n**Hesap Yaşı:** ${Math.floor(hesapYasiGun)} gün önce açılmış.`)
+                    .setDescription(`**Üye:** ${member.user.tag} (${member})\n**Hesap Yaşı:** ${Math.floor(hesapYasiGun)} gün önce açılmış.`)
                     .setTimestamp();
                 await logChannel.send({ embeds: [embed] });
             }
