@@ -298,3 +298,97 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+const { EmbedBuilder } = require('discord.js');
+const badWordsSchema = require('./Modeller/badWordsSchema');
+const FuzzySet = require('fuzzyset');
+
+const userMessageMap = new Map();
+
+client.on('messageCreate', async (message) => {
+    if (!message.guild || message.author.bot) return;
+
+    const userId = message.author.id;
+    const content = message.content;
+    const lowerContent = content.toLowerCase();
+
+    // 1. Spam ve ard arda mesaj koruması
+    if (message.member && !message.member.permissions.has('Administrator')) {
+        const now = Date.now();
+        if (!userMessageMap.has(userId)) userMessageMap.set(userId, []);
+        const timestamps = userMessageMap.get(userId);
+        timestamps.push(now);
+        const recentMessages = timestamps.filter(time => now - time < 3000);
+        userMessageMap.set(userId, recentMessages);
+        
+        if (recentMessages.length >= 3) {
+            try {
+                await message.delete();
+                if (message.member.moderatable) {
+                    await message.member.timeout(3 * 60 * 1000, "Spam koruması");
+                }
+                return;
+            } catch (err) {}
+        }
+    }
+
+    // 2. Küfür ve uygunsuz kelime filtresi
+    const settings = await badWordsSchema.findOne({ Guild: message.guild.id });
+    if (!settings || !settings.ProtectionEnabled) return;
+
+    const defaultBadWords = [
+        "amk", "aq", "aw", "mq", "hdabla", "sik", "sikti", "siktir", "sikim", "sokuk", 
+        "yarrak", "yarak", "orospu", "orosbu", "pezevenk", "şerefsiz", "kahpe", 
+        "göt", "got", "ibne", "ipne", "puşt", "pust", "mal", "porno", "porn", 
+        "sex", "seks", "31", "sidik", "meme", "göğüs", "ananı", "anani"
+    ];
+
+    const dbWords = settings.SwearWords || [];
+    const allBadWords = [...new Set([...defaultBadWords, ...dbWords])];
+    const swearWordsSet = FuzzySet(allBadWords);
+    const threshold = 0.65;
+
+    const words = lowerContent.split(/\s+/);
+    let küfürBulundu = false;
+
+    for (const word of words) {
+        const result = swearWordsSet.get(word);
+        if (result && result[0][0] >= threshold) {
+            küfürBulundu = true;
+            break;
+        }
+    }
+
+    if (!küfürBulundu) {
+        const result2 = swearWordsSet.get(lowerContent);
+        if (result2 && result2[0][0] >= threshold) {
+            küfürBulundu = true;
+        }
+    }
+
+    if (küfürBulundu) {
+        try {
+            if (message.deletable) await message.delete();
+
+            if (message.member && message.member.moderatable) {
+                await message.member.timeout(3 * 60 * 1000, "Küfür koruması");
+            }
+
+            // Uyarı mesajı sadece o kişiye özel (ephemeral tarzı silinebilir geçici uyarı)
+            const warningMsg = await message.channel.send(`${message.author}, küfür veya uygunsuz kelime kullandığın için mesajın silindi ve 3 dakika susturuldun! 🛑`);
+            setTimeout(() => warningMsg.delete().catch(() => {}), 4000);
+
+            const logChannelId = settings.LogChannel;
+            const logChannel = message.guild.channels.cache.get(logChannelId);
+            if (logChannel) {
+                const embed = new EmbedBuilder()
+                    .setColor(0xFF0000)
+                    .setTitle('⚠️ Küfür Tespit Edildi!')
+                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n**Mesaj:** \`${message.content}\``)
+                    .setTimestamp();
+                await logChannel.send({ embeds: [embed] });
+            }
+        } catch (err) {
+            console.error('Hata:', err);
+        }
+    }
+});
