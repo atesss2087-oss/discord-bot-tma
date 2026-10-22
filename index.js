@@ -24,7 +24,7 @@ const client = new Client({
     ],
 });
 
-// ROL ID'LERİ
+// YETKİLİ VE BİLET ROL ID'LERİ
 const YETKILI_ROL_ID = '1533059872655151116';
 const ANA_YETKILI_ROL_1 = '1558732739405025300';
 const ANA_YETKILI_ROL_2 = '1532129489495130233';
@@ -35,13 +35,15 @@ const BILET_ROLLERI = {
     'oyun_bilet': '1531720784735637534',
     'gamepass_bilet': '1531720771691479133',
     'geridonus_bilet': '1531720829824405521',
-    'transfer_bilet': '1531720829824405521'
+    'transfer_bilet': '1531720829824405521',
+    'rutbe_bilet': '1533064202950807712'
 };
 
 const userSelectedCategory = new Map();
 
 const ROBLOX_PLACE_ID = '80024713565142';
 const ROBLOX_OYUN_LINKI = `https://www.roblox.com/tr/games/${ROBLOX_PLACE_ID}/TMA-T-rk-Asker-Oyunu`;
+const TMA_LOGO_URL = 'https://i.ibb.co/68v8z92/1000032255.jpg';
 
 const badWords = [
     "amk", "aq", "aw", "mq", "öç", "oc", "oe", "öe", "piç", "pic",
@@ -73,7 +75,9 @@ function getRobloxPlayerCount() {
                     else resolve(0);
                 } catch (e) { resolve(0); }
             });
-        }).on('error', () => { resolve(0); });
+        }).on('error', () => {
+            resolve(0);
+        });
     });
 }
 
@@ -145,7 +149,6 @@ client.on('interactionCreate', async (interaction) => {
         const { commandName } = interaction;
         const hasPermission = interaction.member.permissions.has('Administrator') || interaction.member.roles.cache.has(YETKILI_ROL_ID);
 
-        // Yetki Kontrolü Gerektiren Komutlar
         const korumaliKomutlar = ['rütbever', 'rütbeal', 'rütbe-terfi', 'rütbe-düşür', 'tam-yasakla', 'oyun-yasak-kaldır'];
         if (korumaliKomutlar.includes(commandName) && !hasPermission) {
             return interaction.reply({ content: 'Bu komutu kullanmak için gerekli yetkiye sahip değilsin!', ephemeral: true });
@@ -153,8 +156,9 @@ client.on('interactionCreate', async (interaction) => {
 
         if (commandName === 'bilet') {
             const embed = new EmbedBuilder()
-                .setTitle('TMA')
-                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki **Destek Talebi Oluştur** butonuna tıklayarak bilet menüsüne ulaşabilirsiniz.')
+                .setTitle('TMA | Destek Sistemi')
+                .setDescription('Yardıma mı ihtiyacınız var?\nAşağıdaki **Destek Talebi Oluştur** butonuna tıklayarak bilet menüsüne ulaşabilirsiniz.\n\n⏱️ **Mesai Saatleri:**\n• **Hafta İçi:** 05.00 - 12.00\n• **Hafta Sonu:** 09.00 - 12.00')
+                .setImage(TMA_LOGO_URL)
                 .setColor(0x2f3136);
 
             const button = new ButtonBuilder()
@@ -202,7 +206,6 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: `**/${commandName}** komutu çalıştırıldı!`, ephemeral: true });
     }
 
-    // "Destek Talebi Oluştur" butonuna basınca kategori menüsünü açma
     if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
         const selectMenu = new StringSelectMenuBuilder()
             .setCustomId('ticket_select_category')
@@ -213,7 +216,8 @@ client.on('interactionCreate', async (interaction) => {
                 { label: 'Gamepass Bileti', value: 'gamepass_bilet', emoji: '🪙' },
                 { label: 'Oyun Destek Bileti', value: 'oyun_bilet', emoji: '⬛' },
                 { label: 'Geri Dönüş Bileti', value: 'geridonus_bilet', emoji: '🎖️' },
-                { label: 'Transfer Bileti', value: 'transfer_bilet', emoji: '🌐' }
+                { label: 'Transfer Bileti', value: 'transfer_bilet', emoji: '🌐' },
+                { label: 'Rütbe Destek Bileti', value: 'rutbe_bilet', emoji: '👥' }
             ]);
 
         const openButton = new ButtonBuilder()
@@ -228,13 +232,11 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: 'Lütfen açmak istediğiniz bilet kategorisini seçip aşağıdaki **Bilet Aç** tuşuna basın:', components: [row1, row2], ephemeral: true });
     }
 
-    // Kategori Seçimi Hafızaya Alma
     if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select_category') {
         userSelectedCategory.set(interaction.user.id, interaction.values[0]);
         return interaction.update({ content: `Seçilen kategori: **${interaction.values[0]}**. Şimdi aşağıdaki **Bilet Aç** tuşuna basabilirsin.`, components: interaction.message.components });
     }
 
-    // Bilet Açma Butonu
     if (interaction.isButton() && interaction.customId === 'open_selected_ticket') {
         const guild = interaction.guild;
         const member = interaction.member;
@@ -266,12 +268,10 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: `Destek talebin başarıyla oluşturuldu: ${ticketChannel}`, ephemeral: true });
             
             await ticketChannel.send({
-                content: `<@&${targetRoleID}> <@&${ANA_YETKILI_ROL_1}> <@&${ANA_YETKILI_ROL_2}>`,
                 embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede ilgilenecektir lütfen bekleyiniz.').setColor(0x3498DB)],
                 components: [closeRow]
             });
 
-            // 2 Saat etkileşimsiz kalırsa otomatik kapatma
             const collector = ticketChannel.createMessageCollector({ time: 2 * 60 * 60 * 1000 });
             let hasActivity = false;
             collector.on('collect', () => { hasActivity = true; });
