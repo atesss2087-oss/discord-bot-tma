@@ -194,10 +194,7 @@ client.once('ready', async () => {
 // ==================================================
 // 7. SPAM VE KÜFÜR KORUMASI (Gelişmiş Liste)
 // ==================================================
-
-const badWords = [
-    "amk", "aq", "aw", "mq", "mk", "amq", "amina", "amına", "amk veledi", "amcık", "amcik", "ammcik", "amcığını", "amciğini", "ananı", "anani", "anan", "anne", "annen", "ananın amı", "ananin ami", "ananı sikeyim", "anani sikeyim", "ananı sikim", "anani sikim", "bacını", "bacini", "bacını sikeyim", "bacini sikeyim", "avradını", "avradini", "sülaleni", "sulaleni", "orospu", "orosbu", "orospu çocuğu", "orospu cocugu", "orosbu çocuğu", "orosbu cocugu", "orospu enigi", "kahpe", "kahbenin evladı", "kahbenin evladi", "fahişe", "fahise", "kaltak", "yosma", "kancık", "kancik", "piç", "pic", "piçin evladı", "picin evladi", "pij", "pezevenk", "p3z3v3nk", "şerefsiz", "serefsiz", "yavşak", "yavsak", "dalyarak", "götveren", "gotveren", "götlek", "gotlek", "top", "ibne", "ipne", "puşt", "pust", "mal", "malsın", "malsin", "mal mısın", "mal misin", "mal herif", "mal oğlu mal", "salak", "aptal", "gerizekalı", "gerizekali", "geri zekalı", "geri zekali", "ahmak", "budala", "embesil", "beyinsiz", "akılsız", "akilsiz", "şapşal", "sapsal", "ezik", "loser", "moron", "dangalak", "hıyar", "hiyar", "öküz", "okuz", "eşek", "esek", "it", "köpek", "kopek", "pislik", "karaktersiz", "haysiyetsiz", "sik", "sikiş", "sikis", "sikti", "siktir", "sikim", "sikimden", "sikem", "sikiyim", "sikerim", "sikik", "sik kafalı", "sik kafali", "sikimin başı", "sikimin basi", "sikimi ye", "sikimle", "siktiğimin", "siktigimin", "siktir git", "yarrak", "yarak", "yarram", "yarramı ye", "yarrami ye", "yarrak kafalı", "yarak kafalı", "yarrak kafasi", "yarak kafali", "yağlı yarrak", "yagli yarrak", "yarragımın başı", "yarragimin basi", "sokuk", "göt", "got", "götünü", "gotunu", "göt deliği", "got deligi", "daşşak", "dassak", "taşak", "tasak", "döl", "dol", "döl israfı", "dol israfi", "sidik", "sıçmak", "sicmak", "sıçtım", "sictim", "ossurdum", "osur­dum", "kaka", "balgam", "pipi", "testis", "penis", "vajina", "vajna", "sperm", "porno", "porn", "pornhub", "xvideos", "xnxx", "hentai", "seks", "sex", "doggy", "mastürbasyon", "masturbasyon", "milf", "nude", "nudes", "nsfw", "boobs", "boob", "tit", "tits", "titties", "dildo", "anal", "pornography", "intercourse", "fetish", "fuck", "fucking", "fucker", "fuckin", "motherfucker", "motherfucking", "shit", "shitting", "shitty", "bitch", "bitches", "asshole", "asshat", "bastard", "dick", "dickhead", "cunt", "pussy", "cock", "cocksucker", "mf", "stfu", "wtf", "whore", "slut", "sluts", "blowjob", "handjob", "cum", "cumshot", "deepthroat", "higger", "nigga", "retard", "faggot", "bullshit", "jackass", "dipshit", "dumbass", "douchebag", "prick", "twat", "wanker", "kill yourself", "kys", "suicide", "die", "öldürürüm", "oldururum", "geber­tirim", "vururum", "keserim", "ifşa", "ifsa", "çete", "cete", "dalton", "turuncusite", "hdabla"
-];
+const badWords = require('./badwords.json');
 
 function normalizeText(text) {
     return text
@@ -266,14 +263,9 @@ client.on("messageCreate", async (message) => {
         try {
             if (message.deletable) await message.delete();
             if (member.moderatable) {
-                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA küfür filtresi");
-            }
-
-            const warningMsg = await message.channel.send({
-                content: `${message.author}, uygunsuz kelime nedeniyle mesajın silindi ve 3 dakika susturuldun. 🛑`,
-                allowedMentions: { users: [message.author.id] }
-            });
-
+                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA const küfürBulundu = normalizedBadWords.some((word) =>
+    normalizedContent.includes(` ${word} `)
+);
             setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
 
             const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
