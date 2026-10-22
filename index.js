@@ -16,10 +16,6 @@ const {
 const express = require('express');
 const https = require('https');
 
-// ==================================================
-// 1. EXPRESS SUNUCUSU (Render için 7/24 canlı tutma)
-// ==================================================
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -33,10 +29,6 @@ app.listen(PORT, () => {
     console.log(`TMA sunucusu ${PORT} portunda çalışıyor.`);
 });
 
-// ==================================================
-// 2. DISCORD BOTU İSTEMCİSİ
-// ==================================================
-
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -45,10 +37,6 @@ const client = new Client({
         GatewayIntentBits.GuildMembers
     ]
 });
-
-// ==================================================
-// 3. TMA ROLLERİ VE AYARLARI
-// ==================================================
 
 const YETKILI_ROL_ID = '1533059872655151116';
 const ANA_YETKILI_ROL_1 = '1558732739405025300';
@@ -69,10 +57,6 @@ const ROBLOX_PLACE_ID = '80024713565142';
 const ROBLOX_OYUN_LINKI = `https://www.roblox.com/tr/games/${ROBLOX_PLACE_ID}/TMA-T-rk-Asker-Oyunu`;
 const TMA_LOGO_URL = 'https://i.ibb.co/68v8z92/1000032255.jpg';
 
-// ==================================================
-// 4. GÜVENLİK VE KORUMA AYARLARI
-// ==================================================
-
 const SECURITY = {
     MESSAGE_WINDOW_MS: 3000,
     MAX_MESSAGES_PER_WINDOW: 3,
@@ -87,23 +71,12 @@ const SECURITY = {
 const userSelectedCategory = new Map();
 const securityMessageMap = new Map();
 const securityCommandMap = new Map();
-const guildSecurityStatus = new Map(); // /güvenlik aktif/inaktif durumu için
-
-const SECURITY_STAFF_ROLES = [
-    YETKILI_ROL_ID,
-    ANA_YETKILI_ROL_1,
-    ANA_YETKILI_ROL_2
-];
+const guildSecurityStatus = new Map();
 
 function isSecurityStaff(member) {
     if (!member || !member.permissions) return false;
     if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
-    return SECURITY_STAFF_ROLES.some(roleId => member.roles.cache.has(roleId));
-}
-
-function hasBotAdminPermission(member) {
-    if (!member) return false;
-    return member.permissions.has(PermissionsBitField.Flags.Administrator) || member.roles.cache.has(YETKILI_ROL_ID);
+    return [YETKILI_ROL_ID, ANA_YETKILI_ROL_1, ANA_YETKILI_ROL_2].some(roleId => member.roles.cache.has(roleId));
 }
 
 function canUseCommand(userId, commandName, cooldownMs) {
@@ -125,7 +98,6 @@ function safeChannelName(username) {
     return safeName || 'uye';
 }
 
-// Bellek temizliği
 setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of securityMessageMap.entries()) {
@@ -135,10 +107,6 @@ setInterval(() => {
         if (now - lastUse > 10 * 60 * 1000) securityCommandMap.delete(key);
     }
 }, 5 * 60 * 1000).unref();
-
-// ==================================================
-// 5. ROBLOX OYUNCU SAYISI
-// ==================================================
 
 function getRobloxPlayerCount() {
     return new Promise((resolve) => {
@@ -159,10 +127,6 @@ function getRobloxPlayerCount() {
         request.on('error', () => { resolve(0); });
     });
 }
-
-// ==================================================
-// 6. SLASH KOMUTLARINI KAYDET
-// ==================================================
 
 client.once('ready', async () => {
     console.log(`TMA Bot çevrimiçi: ${client.user.tag}`);
@@ -191,10 +155,9 @@ client.once('ready', async () => {
     } catch (error) { console.error('Komut kayıt hatası:', error); }
 });
 
-// ==================================================
-// 7. SPAM VE KÜFÜR KORUMASI (Gelişmiş Liste)
-// ==================================================
-const badWords = require('./badwords.json');
+const badWords = [
+    "amk", "aq", "aw", "mq", "mk", "amq", "amina", "amına", "amk veledi", "amcık", "amcik", "ammcik", "amcığını", "amciğini", "ananı", "anani", "anan", "anne", "annen", "ananin ami", "ananı sikeyim", "anani sikeyim", "ananı sikim", "anani sikim", "bacını", "bacini", "bacını sikeyim", "bacini sikeyim", "avradını", "avradini", "sülaleni", "sulaleni", "orospu", "orosbu", "orospu çocuğu", "orospu cocugu", "orosbu çocuğu", "orosbu cocugu", "orospu enigi", "kahpe", "kahbenin evladi", "fahişe", "fahise", "kaltak", "yosma", "kancık", "kancik", "piç", "pic", "picin evladi", "pij", "pezevenk", "p3z3v3nk", "şerefsiz", "serefsiz", "yavşak", "yavsak", "dalyarak", "götveren", "gotveren", "götlek", "gotlek", "top", "ibne", "ipne", "puşt", "pust", "mal", "malsın", "malsin", "salak", "aptal", "gerizekalı", "gerizekali", "ahmak", "budala", "embesil", "beyinsiz", "akılsız", "akilsiz", "şapşal", "sapsal", "ezik", "moron", "dangalak", "hıyar", "hiyar", "öküz", "okuz", "eşek", "esek", "it", "köpek", "kopek", "pislik", "karaktersiz", "haysiyetsiz", "sik", "sikiş", "sikis", "sikti", "siktir", "sikim", "sikimden", "sikem", "sikiyim", "sikerim", "sikik", "sik kafali", "siktigimin", "siktir git", "yarrak", "yarak", "yarram", "yarrami ye", "yarak kafali", "sokuk", "göt", "got", "gotunu", "got deligi", "dassak", "tasak", "döl", "dol", "sidik", "sıçmak", "sicmak", "sictim", "ossurdum", "kaka", "balgam", "pipi", "testis", "penis", "vajina", "sperm", "porno", "porn", "pornhub", "xvideos", "xnxx", "hentai", "seks", "sex", "doggy", "masturbasyon", "milf", "nude", "nudes", "nsfw", "boobs", "tit", "tits", "dildo", "anal", "fuck", "fucking", "fucker", "motherfucker", "shit", "bitch", "asshole", "bastard", "dick", "cunt", "pussy", "cock", "whore", "slut", "cum", "kys", "suicide", "die", "oldururum", "vururum", "keserim", "ifşa", "ifsa", "çete", "cete", "dalton", "turuncusite", "hdabla"
+];
 
 function normalizeText(text) {
     return text
@@ -221,7 +184,6 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
 
     if (!isSecurityStaff(member)) {
-        // SPAM KORUMASI
         const now = Date.now();
         const key = `${message.guild.id}:${userId}`;
         let entry = securityMessageMap.get(key);
@@ -255,7 +217,6 @@ client.on("messageCreate", async (message) => {
         }
     }
 
-    // KÜFÜR FİLTRESİ
     const normalizedContent = normalizeText(message.content);
     const küfürBulundu = normalizedBadWords.some(word => (` ${normalizedContent} `).includes(` ${word} `));
 
@@ -263,9 +224,14 @@ client.on("messageCreate", async (message) => {
         try {
             if (message.deletable) await message.delete();
             if (member.moderatable) {
-                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA const küfürBulundu = normalizedBadWords.some((word) =>
-    normalizedContent.includes(` ${word} `)
-);
+                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA küfür filtresi");
+            }
+
+            const warningMsg = await message.channel.send({
+                content: `${message.author}, uygunsuz kelime nedeniyle mesajın silindi ve 3 dakika susturuldun. 🛑`,
+                allowedMentions: { users: [message.author.id] }
+            });
+
             setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
 
             const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
@@ -280,10 +246,6 @@ client.on("messageCreate", async (message) => {
         } catch (error) { console.error("Küfür filtresi hatası:", error); }
     }
 });
-
-// ==================================================
-// 8. SUNUCU GÜVENLİK (Kanal/Rol Silinme & Şüpheli Hesap)
-// ==================================================
 
 client.on('channelDelete', async (channel) => {
     try {
@@ -339,10 +301,6 @@ client.on('guildMemberAdd', async (member) => {
     } catch (err) {}
 });
 
-// ==================================================
-// 9. SLASH KOMUTLARI (Güvenlik Yönetimi, Bilet, Roblox vb.)
-// ==================================================
-
 client.on('interactionCreate', async (interaction) => {
     try {
         if (interaction.isChatInputCommand()) {
@@ -352,7 +310,6 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: 'Bu komutu tekrar kullanmadan önce 2 saniye bekle!', ephemeral: true });
             }
 
-            // GÜVENLİK KOMUTU (/güvenlik aktif / inaktif)
             if (commandName === 'güvenlik') {
                 if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!', ephemeral: true });
@@ -367,7 +324,6 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
 
-            // BİLGİ KOMUTU
             if (commandName === 'bilgi') {
                 const embed = new EmbedBuilder()
                     .setTitle('🛡️ TMA Koruma ve Bilgi Sistemi')
@@ -381,7 +337,6 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ embeds: [embed], ephemeral: true });
             }
 
-            // BİLET MENÜSÜ AÇMA
             if (commandName === 'bilet') {
                 const embed = new EmbedBuilder()
                     .setTitle('TMA | Destek Sistemi')
@@ -401,7 +356,6 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
-            // ROBLOX AKTİFLİK SORGU
             if (commandName === 'aktiflik-sorgu') {
                 await interaction.deferReply();
                 const playerCount = await getRobloxPlayerCount();
@@ -414,10 +368,6 @@ client.on('interactionCreate', async (interaction) => {
 
             return interaction.reply({ content: `**/${commandName}** komutu çalıştırıldı!`, ephemeral: true });
         }
-
-        // ==================================================
-        // 10. BİLET BUTONLARI VE SİSTEMİ
-        // ==================================================
 
         if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
             const selectMenu = new StringSelectMenuBuilder()
@@ -502,10 +452,6 @@ client.on('interactionCreate', async (interaction) => {
         }
     } catch (error) { console.error('Interaction hatası:', error); }
 });
-
-// ==================================================
-// 11. HATA YÖNETİMİ VE BAŞLATMA
-// ==================================================
 
 client.on('error', (error) => { console.error('Discord hatası:', error); });
 process.on('unhandledRejection', (reason) => { console.error('Promise hatası:', reason); });
