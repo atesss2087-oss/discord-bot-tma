@@ -141,12 +141,45 @@ function getRobloxPlayerCount() {
     });
 }
 
+// Roblox Kullanıcı ID Bulma ve Grup Listesi Çekme Fonksiyonları
+function getRobloxUserGroups(username) {
+    return new Promise((resolve) => {
+        const searchUrl = `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`;
+        https.get(searchUrl, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', async () => {
+                try {
+                    const json = JSON.parse(data);
+                    if (!json.data || json.data.length === 0) return resolve(null);
+                    const userId = json.data[0].id;
+                    const realUsername = json.data[0].name;
+
+                    // Grupları çek
+                    const groupsUrl = `https://groups.roblox.com/v1/users/${userId}/groups/roles`;
+                    https.get(groupsUrl, (gRes) => {
+                        let gData = '';
+                        gRes.on('data', chunk => { gData += chunk; });
+                        gRes.on('end', () => {
+                            try {
+                                const gJson = JSON.parse(gData);
+                                resolve({ username: realUsername, groups: gJson.data || [] });
+                            } catch (e) { resolve(null); }
+                        });
+                    }).on('error', () => resolve(null));
+                } catch (e) { resolve(null); }
+            });
+        }).on('error', () => resolve(null));
+    });
+}
+
 client.once('ready', async () => {
     console.log(`TMA Elite Bot çevrimiçi ve güvenli modda: ${client.user.tag}`);
 
     const commands = [
         new SlashCommandBuilder().setName('bilet').setDescription('TMA Destek ve Bilet merkezini açar (Sadece yetkililer).'),
         new SlashCommandBuilder().setName('grup').setDescription('Resmi Roblox grup bağlantısını gösterir.'),
+        new SlashCommandBuilder().setName('grup-liste').setDescription('Roblox kullanıcısının üye olduğu grupları ve rütbelerini gösterir.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
         new SlashCommandBuilder().setName('rütbeler').setDescription('TMA kademe ve rütbe listesini gösterir.'),
         new SlashCommandBuilder().setName('seviye-tablosu').setDescription('TMA mesaj ve seviye yarış tablosunu gösterir (200 mesaj sınırı).'),
         new SlashCommandBuilder().setName('adam-çekme').setDescription('Üyenin çektiği adam sayısını kaydeder (Özel yetki gerekir).').addUserOption(opt => opt.setName('kullanici').setDescription('Adamı çeken yetkili üye').setRequired(true)),
@@ -194,9 +227,20 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
+    // Seviye ve Mesaj Sistemi (200 mesaj sınırı ve seviye atlama duyurusu)
     const currentCount = userMessageCounts.get(userId) || 0;
     if (currentCount < 200) {
         userMessageCounts.set(userId, currentCount + 1);
+        const yeniSayi = currentCount + 1;
+        
+        // Her 10 mesajda bir seviye atlama kontrolü (örnek: 10. mesajda Seviye 2)
+        if (yeniSayi > 1 && yeniSayi % 10 === 0) {
+            const yeniSeviye = Math.floor(yeniSayi / 10) + 1;
+            await message.channel.send({
+                content: `🎉 Tebrikler ${message.author}, Seviye ${yeniSeviye}'e yükseldin!`,
+                allowedMentions: { users: [message.author.id] }
+            }).catch(() => {});
+        }
     }
 
     if (content === 'merhaba' || content === 'selam') {
@@ -208,7 +252,7 @@ client.on("messageCreate", async (message) => {
         return;
     }
     if (content === 'sa' || content === 's a' || content === 's.a') {
-        await message.reply('as cano hoş geldin');
+        await message.reply('Aleykümselam, hoşgeldin.');
         return;
     }
 
@@ -347,6 +391,27 @@ client.on('interactionCreate', async (interaction) => {
 
             if (!canUseCommand(interaction.user.id, commandName, SECURITY.COMMAND_COOLDOWN_MS)) {
                 return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle!', ephemeral: true });
+            }
+
+            // /grup-liste Komutu (Fotodaki Roblox grup sorgulama ekranı)
+            if (commandName === 'grup-liste') {
+                const username = options.getString('kullaniciadi');
+                await interaction.deferReply();
+
+                const result = await getRobloxUserGroups(username);
+                if (!result || !result.groups || result.groups.length === 0) {
+                    return interaction.editReply({ content: `❌ **${username}** adlı kullanıcı bulunamadı veya herhangi bir grupta yer almıyor.` });
+                }
+
+                let responseText = `**İşlem başarıyla tamamlandı**\n**${result.username}** isimli kişinin mevcut olduğu gruplar:\n\n`;
+                result.groups.slice(0, 5).forEach(g => {
+                    responseText += `**${g.group.name}**\n`;
+                    responseText += `Grup IDsi: ${g.group.id}\n`;
+                    responseText += `Üye Sayısı: ${g.group.memberCount}\n`;
+                    responseText += `Rütbe: \`${g.role.name}\`\n\n`;
+                });
+
+                return interaction.editReply({ content: responseText });
             }
 
             if (commandName === 'adam-çekme') {
@@ -515,8 +580,8 @@ client.on('interactionCreate', async (interaction) => {
                     .addFields(
                         { name: '⚡ Gelişmiş Güvenlik ve Moderasyon', value: '• **Spam Koruması:** Sınır aşımında anlık susturma ve log bildirimi.\n• **Küfür Filtresi:** Genişletilmiş filtre havuzu, sessiz kullanıcı uyarısı ve herkese açık log/mute bildirim mekanizması.' },
                         { name: '🎫 Kategori Bazlı Destek Sistemi', value: '• Mod, Reklam, Oyun, Gamepass, Geri Dönüş ve Transfer biletleri.\n• **Transfer Bileti Gizliliği:** Sadece özel transfer rolü ve yöneticiler görebilir, etiketleme yapılmaz.' },
-                        { name: '🎮 Roblox & Askeri Komutlar', value: '• `/grup`, `/rütbeler`, `/aktiflik-sorgu`, `/profil` komutları.\n• **Adam Çekme Yarışı:** `/adam-çekme` ve herkesin erişebildiği `/adam-çekme-tablosu`.' },
-                        { name: '📊 Seviye ve Yarış Sistemi', value: '• 200 mesaj sınırlı, XP ve seviye atlamalı TMA mesaj yarış tablosu (`/seviye-tablosu`).' }
+                        { name: '🎮 Roblox & Askeri Komutlar', value: '• `/grup`, `/grup-liste`, `/rütbeler`, `/aktiflik-sorgu`, `/profil` komutları.\n• **Adam Çekme Yarışı:** `/adam-çekme` ve herkesin erişebildiği `/adam-çekme-tablosu`.' },
+                        { name: '📊 Seviye ve Yarış Sistemi', value: '• 200 mesaj sınırlı, XP ve seviye atlamalı TMA mesaj yarış tablosu ve seviye atlama duyuruları (`/seviye-tablosu`).' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
