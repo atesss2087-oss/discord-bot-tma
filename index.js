@@ -3,7 +3,6 @@ const express = require('express');
 const https = require('https');
 const FuzzySet = require('fuzzyset');
 
-// --- 1. RENDER İÇİN EXPRESS SUNUCUSU ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -15,7 +14,6 @@ app.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
 });
 
-// --- 2. DİSCORD BOTU AYARLARI ---
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -25,7 +23,6 @@ const client = new Client({
     ],
 });
 
-// YETKİLİ VE BİLET ROL ID'LERİ
 const YETKILI_ROL_ID = '1533059872655151116';
 const ANA_YETKILI_ROL_1 = '1558732739405025300';
 const ANA_YETKILI_ROL_2 = '1532129489495130233';
@@ -60,9 +57,7 @@ function getRobloxPlayerCount() {
                     else resolve(0);
                 } catch (e) { resolve(0); }
             });
-        }).on('error', () => {
-            resolve(0);
-        });
+        }).on('error', () => { resolve(0); });
     });
 }
 
@@ -92,7 +87,6 @@ client.once('ready', async () => {
     } catch (error) { console.error(error); }
 });
 
-// --- KÜFÜR VE SPAM KORUMA EVENTİ ---
 client.on('messageCreate', async (message) => {
     if (!message.guild || message.author.bot) return;
 
@@ -100,7 +94,6 @@ client.on('messageCreate', async (message) => {
     const content = message.content;
     const lowerContent = content.toLowerCase();
 
-    // 1. Spam ve ard arda mesaj koruması
     if (message.member && !message.member.permissions.has('Administrator')) {
         const now = Date.now();
         if (!userMessageMap.has(userId)) userMessageMap.set(userId, []);
@@ -120,7 +113,6 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // 2. Küfür ve uygunsuz kelime filtresi
     const badWordsSchema = require('./Modeller/badWordsSchema');
     const settings = await badWordsSchema.findOne({ Guild: message.guild.id });
     if (!settings || !settings.ProtectionEnabled) return;
@@ -182,7 +174,6 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- BUTON VE KOMUT ETKİLEŞİMLERİ ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
@@ -222,4 +213,118 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (commandName === 'rütbeal') {
-            const targetMember = interaction.options.getMember('
+            const targetMember = interaction.options.getMember('kullanici');
+            const targetRole = interaction.options.getRole('rol');
+            try {
+                await targetMember.roles.remove(targetRole);
+                return interaction.reply({ content: `Başarıyla ${targetMember} adlı üyeden **${targetRole.name}** rütbesi alındı!`, ephemeral: true });
+            } catch (err) {
+                return interaction.reply({ content: 'Rol alınamadı!', ephemeral: true });
+            }
+        }
+
+        if (commandName === 'aktiflik-sorgu') {
+            await interaction.deferReply();
+            const playerCount = await getRobloxPlayerCount();
+            const embed = new EmbedBuilder()
+                .setTitle(`🟢 TMA oyununun aktifliği: ${playerCount}`)
+                .setDescription(`Oyuna katılmak için tıkla:\n🔗 [Oyuna Git](${ROBLOX_OYUN_LINKI})`)
+                .setColor(0x00FF00);
+            return interaction.editReply({ embeds: [embed] });
+        }
+
+        return interaction.reply({ content: `**/${commandName}** komutu çalıştırıldı!`, ephemeral: true });
+    }
+
+    if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId('ticket_select_category')
+            .setPlaceholder('Destek kategorinizi seçin...')
+            .addOptions([
+                { label: 'Moderatör Bileti', value: 'moderator_bilet', emoji: '🛡️' },
+                { label: 'Reklam Destek Bileti', value: 'reklam_bilet', emoji: '⚖️' },
+                { label: 'Gamepass Bileti', value: 'gamepass_bilet', emoji: '🪙' },
+                { label: 'Oyun Destek Bileti', value: 'oyun_bilet', emoji: '⬛' },
+                { label: 'Geri Dönüş Bileti', value: 'geridonus_bilet', emoji: '🎖️' },
+                { label: 'Transfer Bileti', value: 'transfer_bilet', emoji: '🌐' },
+                { label: 'Rütbe Destek Bileti', value: 'rutbe_bilet', emoji: '👥' }
+            ]);
+
+        const openButton = new ButtonBuilder()
+            .setCustomId('open_selected_ticket')
+            .setLabel('Bilet Aç')
+            .setStyle(ButtonStyle.Success)
+            .setEmoji('🎫');
+
+        const row1 = new ActionRowBuilder().addComponents(selectMenu);
+        const row2 = new ActionRowBuilder().addComponents(openButton);
+
+        return interaction.reply({ content: 'Lütfen açmak istediğiniz bilet kategorisini seçip aşağıdaki **Bilet Aç** tuşuna basın:', components: [row1, row2], ephemeral: true });
+    }
+
+    if (interaction.isStringSelectMenu() && interaction.customId === 'ticket_select_category') {
+        userSelectedCategory.set(interaction.user.id, interaction.values[0]);
+        return interaction.update({ content: `Seçilen kategori: **${interaction.values[0]}**. Şimdi aşağıdaki **Bilet Aç** tuşuna basabilirsin.`, components: interaction.message.components });
+    }
+
+    if (interaction.isButton() && interaction.customId === 'open_selected_ticket') {
+        const guild = interaction.guild;
+        const member = interaction.member;
+        const selectedCategory = userSelectedCategory.get(member.id);
+
+        if (!selectedCategory) {
+            return interaction.reply({ content: 'Lütfen önce menüden bir kategori seçin!', ephemeral: true });
+        }
+
+        const targetRoleID = BILET_ROLLERI[selectedCategory];
+
+        try {
+            const ticketChannel = await guild.channels.create({
+                name: `bilet-${member.user.username}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: targetRoleID, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: ANA_YETKILI_ROL_1, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: ANA_YETKILI_ROL_2, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                ],
+            });
+
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Bileti Kapat').setStyle(ButtonStyle.Danger).setEmoji('🔒')
+            );
+
+            await interaction.reply({ content: `Destek talebin başarıyla oluşturuldu: ${ticketChannel}`, ephemeral: true });
+            
+            await ticketChannel.send({
+                embeds: [new EmbedBuilder().setTitle('TMA Destek Talebi').setDescription('Yetkililer en kısa sürede ilgilenecektir lütfen bekleyiniz.').setColor(0x3498DB)],
+                components: [closeRow]
+            });
+
+            const collector = ticketChannel.createMessageCollector({ time: 2 * 60 * 60 * 1000 });
+            let hasActivity = false;
+            collector.on('collect', () => { hasActivity = true; });
+            collector.on('end', async () => {
+                if (!hasActivity) {
+                    try {
+                        await ticketChannel.send('Bu bilet 2 saat boyunca etkileşim almadığı için otomatik olarak kapatılıyor.');
+                        setTimeout(() => ticketChannel.delete().catch(() => {}), 5000);
+                    } catch (e) {}
+                }
+            });
+
+        } catch (err) {
+            await interaction.reply({ content: 'Bilet kanalı oluşturulurken bir hata oluştu!', ephemeral: true });
+        }
+    }
+
+    if (interaction.isButton() && interaction.customId === 'close_ticket') {
+        await interaction.reply({ content: 'Bilet 5 saniye içinde kapatılıyor...' });
+        setTimeout(() => {
+            interaction.channel.delete().catch(() => {});
+        }, 5000);
+    }
+});
+
+client.login(process.env.DISCORD_TOKEN);
