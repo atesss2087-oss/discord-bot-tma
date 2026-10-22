@@ -176,19 +176,19 @@ client.on("messageCreate", async (message) => {
 
     const member = message.member;
     const userId = message.author.id;
-    const content = message.content.trim().toLowerCase();
+    const content = normalizeText(message.content);
 
-    // --- SOHBET CEVAPLARI (Tek ve Kesin Yanıt) ---
+    // --- SOHBET CEVAPLARI (Kesin ve Net Eşleşme) ---
     if (content === 'merhaba' || content === 'selam') {
-        await message.channel.send({ content: 'meraba cano nasılsın' });
+        await message.reply('meraba cano nasılsın');
         return;
     }
     if (content === 'iyiyim sen' || content === 'iyiyim sen?') {
-        await message.channel.send({ content: 'bende çok iyiyim çok teşekkür ederim cano' });
+        await message.reply('bende çok iyiyim çok teşekkür ederim cano');
         return;
     }
-    if (content === 'sa' || content === 's.a.') {
-        await message.channel.send({ content: 'as cano hoş geldin' });
+    if (content === 'sa' || content === 's a' || content === 's.a') {
+        await message.reply('as cano hoş geldin');
         return;
     }
 
@@ -226,8 +226,7 @@ client.on("messageCreate", async (message) => {
     }
 
     // KÜFÜR FİLTRESİ
-    const normalizedContent = normalizeText(message.content);
-    const küfürBulundu = normalizedBadWords.some(word => (` ${normalizedContent} `).includes(` ${word} `));
+    const küfürBulundu = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
 
     if (küfürBulundu) {
         try {
