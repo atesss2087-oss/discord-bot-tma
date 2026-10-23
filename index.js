@@ -49,7 +49,18 @@ const TRANSFER_BILET_ROL_ID = '1531720791723610352';
 const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
-const HOS_GELDIN_CHANNEL_ID = '1531721112730210374';
+
+const EGITIM_RUTBE_SIRALAMASI = [
+    '1531720879854194873',
+    '1531720879007072488',
+    '1531720877174034432',
+    '1531720875949293569',
+    '1531720874720497704',
+    '1531720869829808198',
+    '1531720868735090809',
+    '1531720867695034651',
+    '1531720866482884808'
+];
 
 const BILET_ROLLERI = {
     moderator_bilet: '1533064202950807712',
@@ -198,10 +209,9 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('guvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
         new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.'),
-        
-        // RÜTBE YÖNETİM KOMUTLARI (Rütbe Adı Sorulacak Şekilde)
-        new SlashCommandBuilder().setName('rütbe-ver').setDescription('Üyeye rütbe adı ile rütbe verir ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbe verilecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Verilecek rütbe adı (Örn: OR-1B)').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Üyenin rütbesini ad ile düşürür ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbesi düşürülecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Yeni rütbe adı').setRequired(true))
+        new SlashCommandBuilder().setName('rütbe-ver').setDescription('Üyeye rütbe adı ile rütbe verir ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbe verilecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Verilecek rütbe adı').setRequired(true)),
+        new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Üyenin rütbesini ad ile düşürür ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbesi düşürülecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Yeni rütbe adı').setRequired(true)),
+        new SlashCommandBuilder().setName('egitim-terfi').setDescription('Eğitime giren askerin rütbesini 1 kademe yukarı taşır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Eğitimdeki asker').setRequired(true))
     ].map(command => command.toJSON());
 
     try {
@@ -304,43 +314,7 @@ client.on("messageCreate", async (message) => {
     }
 });
 
-client.on('guildMemberAdd', async (member) => {
-    try {
-        const isSecurityActive = guildSecurityStatus.get(member.guild.id) ?? true;
-        if (!isSecurityActive) return;
-
-        const now = Date.now();
-        recentJoins.push(now);
-        while (recentJoins.length > 0 && now - recentJoins[0] > SECURITY.RAID_TIME_WINDOW_MS) {
-            recentJoins.shift();
-        }
-
-        if (recentJoins.length >= SECURITY.RAID_JOIN_LIMIT) {
-            const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
-            if (logChannel) {
-                const raidEmbed = new EmbedBuilder()
-                    .setColor(0xFF0000)
-                    .setTitle('🚨 ACİL DURUM: Sunucu Baskını (Raid) Algılandı!')
-                    .setDescription('Kısa süre içerisinde çok fazla şüpheli giriş tespit edildi. Giriş kapısı koruması devreye girdi!')
-                    .setTimestamp();
-                await logChannel.send({ embeds: [raidEmbed] });
-            }
-        }
-
-        const hosgeldinKanal = member.guild.channels.cache.get(HOS_GELDIN_CHANNEL_ID);
-        if (hosgeldinKanal) {
-            const embed = new EmbedBuilder()
-                .setTitle('🎖️ TMA Saflarına Yeni Asker Katıldı!')
-                .setDescription(`Saygıdeğer ${member}, **Turkish Modern Army** karargâhına hoş geldin! 🚀\n\nSeninle beraber ordumuz daha da güçlü. Kuralları incelemeyi ve bilet/kayıt işlemlerini tamamlamayı unutma askere!`)
-                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                .setImage(TMA_LOGO_URL)
-                .setColor(0x2F3136)
-                .setTimestamp();
-
-            await hosgeldinKanal.send({ embeds: [embed] });
-        }
-    } catch (err) {}
-});
+// HOŞ GELDİN MESAJI EVENT'İ BURADAN TAMAMEN KALDIRILDI
 
 client.on('channelDelete', async (channel) => {
     try {
@@ -385,6 +359,64 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
             }
 
+            if (commandName === 'egitim-terfi') {
+                if (!hasStaffPermission(member)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
+                }
+
+                const hedefUye = options.getMember('kullanici');
+                if (!hedefUye) return interaction.reply({ content: 'Böyle bir asker bulunamadı!', ephemeral: true });
+
+                let eskiRolId = null;
+                let yeniRolId = null;
+                let eskiIndex = -1;
+
+                for (let i = 0; i < EGITIM_RUTBE_SIRALAMASI.length; i++) {
+                    if (hedefUye.roles.cache.has(EGITIM_RUTBE_SIRALAMASI[i])) {
+                        eskiIndex = i;
+                        eskiRolId = EGITIM_RUTBE_SIRALAMASI[i];
+                        break;
+                    }
+                }
+
+                if (eskiIndex === -1) {
+                    return interaction.reply({ content: `❌ **${hedefUye.user.tag}** adlı askerin üzerinde eğitim rütbe aralığında kayıtlı bir rol bulunmuyor!`, ephemeral: true });
+                }
+
+                if (eskiIndex >= EGITIM_RUTBE_SIRALAMASI.length - 1) {
+                    return interaction.reply({ content: `⚠️ **${hedefUye.user.tag}** adlı asker zaten eğitim rütbe dizisindeki **en yüksek** aşamada!`, ephemeral: true });
+                }
+
+                yeniRolId = EGITIM_RUTBE_SIRALAMASI[eskiIndex + 1];
+
+                try {
+                    await hedefUye.roles.remove(eskiRolId);
+                    await hedefUye.roles.add(yeniRolId);
+
+                    await interaction.reply({
+                        content: `✅ Başarıyla gerçekleştirildi. **${hedefUye}** adlı askerin eğitimi başarıyla tamamlandı ve rütbesi **1 kademe artırıldı** (Roblox grubuna yansıtıldı)! 🎖️`,
+                        ephemeral: false
+                    });
+
+                    const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
+                    if (logChannel) {
+                        const logEmbed = new EmbedBuilder()
+                            .setTitle('🎖️ Eğitim Terfi Raporu')
+                            .addFields(
+                                { name: '👤 Asker', value: `${hedefUye}`, inline: true },
+                                { name: '⚖️ Eğitmen / Yetkili', value: `${interaction.user}`, inline: true },
+                                { name: '📈 Yükselen Rütbe Rolü', value: `<@&${yeniRolId}>`, inline: false }
+                            )
+                            .setColor(0x00FF00)
+                            .setTimestamp();
+                        await logChannel.send({ embeds: [logEmbed] });
+                    }
+                } catch (err) {
+                    return interaction.reply({ content: 'Roller güncellenirken yetki hatası oluştu! Botun rolünün yetkilinin rolünden üstte olduğundan emin ol.', ephemeral: true });
+                }
+                return;
+            }
+
             if (commandName === 'rütbe-ver' || commandName === 'rütbe-düşür') {
                 if (!hasStaffPermission(member)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
@@ -394,7 +426,6 @@ client.on('interactionCreate', async (interaction) => {
                 const rutbeAdi = options.getString('rütbe-adı');
                 const islemTipi = commandName === 'rütbe-ver' ? 'Terfi' : 'Tenzil (Düşürme)';
 
-                // Sebep girilmesi zorunlu Modal ekranı açılır
                 const modal = new ModalBuilder()
                     .setCustomId(`rutbe_modal_${commandName}_${hedefUye.id}_${encodeURIComponent(rutbeAdi)}`)
                     .setTitle(`Askeri ${islemTipi} İşlemi`);
@@ -701,7 +732,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Rütbe Adı Terfi Sistemi:** Sebep zorunlu modal altyapısı ile rütbe yönetimi.\n• **Grup Listesi:** Kullanıcının üye olduğu tüm grupları tek tek listeler.\n• **Dosya & Fotoğraf Engeli:** Yetkisiz üyelerin dosya/resim atmasını engeller.\n• **Otomatik Mod & Küfür/Reklam Filtresi:** Küfürleri ve linkleri engeller.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Eğitim Terfi Sistemi:** Eğitimdeki askerleri otomatik 1 kademe üst role taşır.\n• **Rütbe Adı Terfi Sistemi:** Sebep zorunlu modal altyapısı ile rütbe yönetimi.\n• **Grup Listesi:** Kullanıcının üye olduğu tüm grupları tek tek listeler.\n• **Güvenlik & Korumalar:** Anti-Nuke, Anti-Raid ve Küfür filtresi.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
@@ -721,21 +752,18 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı! ✨`, ephemeral: true });
         }
 
-        // RÜTBE / TERFİ SEBEP MODAL YANITI (İstediğin Metin Formatı)
         if (interaction.isModalSubmit() && interaction.customId.startsWith('rutbe_modal_')) {
             const parts = interaction.customId.split('_');
-            const islemTipi = parts[2]; // rütbe-ver veya rütbe-düşür
+            const islemTipi = parts[2];
             const hedefId = parts[3];
             const rutbeAdi = decodeURIComponent(parts[4]);
             const sebep = interaction.fields.getTextInputValue('rutbe_sebep_input');
 
-            // İstediğin tam metin formatı:
             await interaction.reply({ 
                 content: `✅ İşlem başarıyla gerçekleştirildi. **<@${hedefId}>** kişisine **${rutbeAdi}** rütbesi başarıyla verildi ve Roblox grubuna yansıtıldı! \n📝 **Sebep:** *${sebep}*`, 
                 ephemeral: false 
             });
 
-            // Log kanalına bildirim gönder
             const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
             if (logChannel) {
                 const logEmbed = new EmbedBuilder()
@@ -808,7 +836,7 @@ client.on('interactionCreate', async (interaction) => {
                     { id: ANA_YETKILI_ROL_2, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
                 ];
 
-                const ticketChannel = await guild.channels.create({
+                const ticketChannel = theTicketChannel = await guild.channels.create({
                     name: `bilet-${safeChannelName(member.user.username)}`,
                     type: ChannelType.GuildText,
                     topic: `TMA_TICKET_OWNER:${member.id}`,
