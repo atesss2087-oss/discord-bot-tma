@@ -47,7 +47,6 @@ const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
 const HOS_GELDIN_CHANNEL_ID = '1531721112730210374';
-const BOT_SOHBET_CHANNEL_ID = '1563106780827877386'; // Sadece bu kanalda otomatik sohbet aktif
 
 const BILET_ROLLERI = {
     moderator_bilet: '1533064202950807712',
@@ -176,7 +175,6 @@ function getRobloxUserGroups(username) {
 client.once('ready', async () => {
     console.log(`TMA Elite Bot çevrimiçi ve güvenli modda: ${client.user.tag}`);
 
-    // Sadece tamamen Türkçe ve düzenlenmiş komutlar kayıt ediliyor
     const commands = [
         new SlashCommandBuilder().setName('bilet').setDescription('TMA Destek ve Bilet merkezini açar (Sadece yetkililer).'),
         new SlashCommandBuilder().setName('grup').setDescription('Resmi Roblox grup bağlantısını gösterir.'),
@@ -233,54 +231,40 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
-    // Sadece 1563106780827877386 ID'li kanalda otomatik sohbet ve küfür kontrolü çalışır
-    if (message.channel.id === BOT_SOHBET_CHANNEL_ID) {
-        const küfürVarMi = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
-        if (küfürVarMi) {
-            try {
-                if (message.deletable) await message.delete();
-                const warningMsg = await message.channel.send({
-                    content: `✨ Saygıdeğer askerimiz ${message.author}, karargâhımızın bu nezih kanalında lütfen daha özenli ve kibar bir dil kullanalım! 🛑🛡️`,
-                    allowedMentions: { users: [message.author.id] }
-                });
-                setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
-            } catch (err) {}
-            return;
-        }
+    // KÜFÜR KONTROLÜ
+    const küfürBulundu = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
+    if (küfürBulundu) {
+        try {
+            if (message.deletable) await message.delete();
+            if (member.moderatable) {
+                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA küfür filtresi");
+            }
 
-        if (content.includes('merhaba') || content.includes('selam') || content === 'sa') {
-            await message.reply('Aleykümselam, TMA karargâhına hoş geldin! Nasılsın bugün asker? 🫡✨');
-            return;
-        }
-        if (content.includes('nasılsın') || content.includes('nasilsin') || content.includes('ne yapıyon') || content.includes('ne yapiyon')) {
-            await message.reply('Çok teşekkür ederim, ordumuz için çalışmaya ve nöbet tutmaya devam ediyorum! Sen nasılsın bakalım? 🚀🎖️');
-            return;
-        }
-        if (content.includes('iyi') || content.includes('süper') || content.includes('kralsın') || content.includes('kralsin')) {
-            await message.reply('Sağ olasın var olasın! Seninle beraber ordumuz daha da güçlü asker! 🌟💪');
-            return;
-        }
-        if (content.includes('teşekkür') || content.includes('tesekkur') || content.includes('eyvallah')) {
-            await message.reply('Rica ederim, ne demek her zaman emrindeyiz! 🛡️🤝');
-            return;
-        }
-        
-        await message.reply('Anlaşıldı asker, emrindeyiz! Karargâhta her şey yolunda ve kontrolümüz altında. 🫡🚀');
+            const warningMsg = await message.channel.send({
+                content: `${message.author}, uygunsuz dil kullanımı nedeniyle mesajın silindi ve 3 dakika susturuldun. Lütfen daha dikkatli olalım! 🛑`,
+                allowedMentions: { users: [message.author.id] }
+            });
+
+            setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
+        } catch (error) {}
         return;
     }
 
+    // İSTEDİĞİN İKİ AŞAMALI SOHBET DİYALOĞU (Tek ve net cevap, fazlalık yok)
+    if (content === 'sa' || content === 'selam' || content === 'merhaba') {
+        await message.reply('Aleykümselam cano hoşgeldin nasılsın?');
+        return;
+    }
+
+    if (content.includes('iyiyim sen') || content.includes('iyi sen') || content.includes('sag ol sen') || content.includes('sağ ol sen') || content.includes('sagol sen')) {
+        await message.reply('Ben de çok iyiyim çok teşekkür ederim cano');
+        return;
+    }
+
+    // SPAM KONTROLÜ VE SEVİYE SİSTEMİ (Fazladan mesaj atmadan sessizce arka planda çalışır)
     const currentCount = userMessageCounts.get(userId) || 0;
     if (currentCount < 200) {
         userMessageCounts.set(userId, currentCount + 1);
-        const yeniSayi = currentCount + 1;
-        
-        if (yeniSayi > 1 && yeniSayi % 10 === 0) {
-            const yeniSeviye = Math.floor(yeniSayi / 10) + 1;
-            await message.channel.send({
-                content: `🎉 Tebrikler ${message.author}, Seviye ${yeniSeviye}'e yükseldin! Devam et asker! 🚀`,
-                allowedMentions: { users: [message.author.id] }
-            }).catch(() => {});
-        }
     }
 
     const now = Date.now();
@@ -301,46 +285,8 @@ client.on("messageCreate", async (message) => {
             if (member.moderatable) {
                 await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA otomatik spam koruması");
             }
-
-            const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFFA500)
-                    .setTitle('⚡ Elite Spam Koruması Devrede!')
-                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n3 saniyede 3+ mesaj attığı için otomatik susturuldu.`)
-                    .setTimestamp();
-                await logChannel.send({ embeds: [embed] });
-            }
-        } catch (error) { console.error("Spam koruması hatası:", error.message); }
+        } catch (error) {}
         return;
-    }
-
-    const küfürBulundu = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
-
-    if (küfürBulundu) {
-        try {
-            if (message.deletable) await message.delete();
-            if (member.moderatable) {
-                await member.timeout(SECURITY.SPAM_TIMEOUT_MS, "TMA küfür filtresi");
-            }
-
-            const warningMsg = await message.channel.send({
-                content: `${message.author}, uygunsuz dil kullanımı nedeniyle mesajın silindi ve 3 dakika susturuldun. Lütfen daha dikkatli olalım! 🛑`,
-                allowedMentions: { users: [message.author.id] }
-            });
-
-            setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
-
-            const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFF0000)
-                    .setTitle('🛑 Küfür / Uygunsuz Dil Engellendi (Mute)')
-                    .setDescription(`**Üye:** ${message.author.tag} (${message.author})\n**Kanal:** ${message.channel}\n**İşlem:** 3 dakika süreyle susturuldu.`)
-                    .setTimestamp();
-                await logChannel.send({ embeds: [embed] });
-            }
-        } catch (error) { console.error("Küfür filtresi hatası:", error); }
     }
 });
 
@@ -360,53 +306,6 @@ client.on('guildMemberAdd', async (member) => {
                 .setTimestamp();
 
             await hosgeldinKanal.send({ embeds: [embed] });
-        }
-
-        const hesapYasiGun = (Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24);
-        if (hesapYasiGun < 3) {
-            const logChannel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
-            if (logChannel) {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFFA500)
-                    .setTitle('⚠️ Şüpheli Yeni Hesap Tespit Edildi!')
-                    .setDescription(`**Üye:** ${member.user.tag} (${member})\n**Hesap Yaşı:** ${Math.floor(hesapYasiGun)} gün önce açılmış.`)
-                    .setTimestamp();
-                await logChannel.send({ embeds: [embed] });
-            }
-        }
-    } catch (err) { console.error('Hoş geldin hatası:', err); }
-});
-
-client.on('channelDelete', async (channel) => {
-    try {
-        const isSecurityActive = guildSecurityStatus.get(channel.guild.id) ?? true;
-        if (!isSecurityActive) return;
-
-        const logChannel = channel.guild.channels.cache.get(LOG_CHANNEL_ID);
-        if (logChannel) {
-            const embed = new EmbedBuilder()
-                .setColor(0xFF0000)
-                .setTitle('🚨 TEHLİKE: Kanal İmha Edildi!')
-                .setDescription(`Silinen Kanal: **#${channel.name}**`)
-                .setTimestamp();
-            await logChannel.send({ embeds: [embed] });
-        }
-    } catch (err) {}
-});
-
-client.on('roleDelete', async (role) => {
-    try {
-        const isSecurityActive = guildSecurityStatus.get(role.guild.id) ?? true;
-        if (!isSecurityActive) return;
-
-        const logChannel = role.guild.channels.cache.get(LOG_CHANNEL_ID);
-        if (logChannel) {
-            const embed = new EmbedBuilder()
-                .setColor(0xFF0000)
-                .setTitle('🚨 TEHLİKE: Rol Silindi!')
-                .setDescription(`Silinen Rol: **${role.name}**`)
-                .setTimestamp();
-            await logChannel.send({ embeds: [embed] });
         }
     } catch (err) {}
 });
@@ -506,10 +405,7 @@ client.on('interactionCreate', async (interaction) => {
                 const hedefUye = options.getMember('kullanici');
                 const sebep = options.getString('sebep') || 'Belirtilmedi';
 
-                if (!hedefUye) {
-                    return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
-                }
-                if (!hedefUye.kickable) {
+                if (!hedefUye || !hedefUye.kickable) {
                     return interaction.reply({ content: 'Bu üyeyi sunucudan atamam.', ephemeral: true });
                 }
 
@@ -524,10 +420,7 @@ client.on('interactionCreate', async (interaction) => {
                 const hedefUye = options.getMember('kullanici');
                 const sebep = options.getString('sebep') || 'Belirtilmedi';
 
-                if (!hedefUye) {
-                    return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
-                }
-                if (!hedefUye.bannable) {
+                if (!hedefUye || !hedefUye.bannable) {
                     return interaction.reply({ content: 'Bu üyeyi yasaklayamam.', ephemeral: true });
                 }
 
@@ -542,7 +435,6 @@ client.on('interactionCreate', async (interaction) => {
 
                 const hedefUye = options.getUser('kullanici');
                 const hedefId = hedefUye.id;
-
                 const mevcutSayi = adamCekmeCounts.get(hedefId) || 0;
                 adamCekmeCounts.set(hedefId, mevcutSayi + 1);
 
