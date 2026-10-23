@@ -47,7 +47,7 @@ const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
 const HOS_GELDIN_CHANNEL_ID = '1531721112730210374';
-const BOT_SOHBET_CHANNEL_ID = '1563106780827877386'; // Sadece bu kanalda otomatik sohbet aktif olacak
+const BOT_SOHBET_CHANNEL_ID = '1563106780827877386'; // Sadece bu kanalda otomatik sohbet aktif
 
 const BILET_ROLLERI = {
     moderator_bilet: '1533064202950807712',
@@ -232,7 +232,7 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
-    // SADECE BELİRTTİĞİN ÖZEL KANALDA OTOMATİK SOHBET VE KÜFÜR KONTROLÜ
+    // SADECE 1563106780827877386 ID'li kanalda otomatik sohbet ve küfür kontrolü çalışır
     if (message.channel.id === BOT_SOHBET_CHANNEL_ID) {
         const küfürVarMi = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
         if (küfürVarMi) {
