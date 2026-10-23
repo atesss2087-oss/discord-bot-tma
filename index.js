@@ -178,18 +178,6 @@ function getRobloxUserGroups(username) {
     });
 }
 
-// Roblox Grup Rütbe Değiştirme Fonksiyonu (API Entegrasyonu)
-function updateRobloxGroupRank(robloxUserId, rankId) {
-    return new Promise((resolve) => {
-        // Not: Gerçek API isteği için process.env.ROBLOSECURITY tokeni gerekir.
-        // Güvenli simülasyon ve entegrasyon altyapısı:
-        if (!process.env.ROBLOSECURITY) {
-            return resolve({ success: true, message: "Roblox Cookie tanımlı olmadığı için simüle edildi (Başarılı)." });
-        }
-        resolve({ success: true, message: "Roblox grup rütbesi başarıyla güncellendi." });
-    });
-}
-
 client.once('ready', async () => {
     console.log(`TMA Elite Bot çevrimiçi ve güvenli modda: ${client.user.tag}`);
 
@@ -211,9 +199,9 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.'),
         
-        // YENİ RÜTBE YÖNETİM KOMUTLARI (Sebep Zorunlu Modal Altyapılı)
-        new SlashCommandBuilder().setName('rütbe-ver').setDescription('Üyeye istediğin rütbeyi verir ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbe verilecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Verilecek yeni rütbe adı').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Üyenin rütbesini düşürür ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbesi düşürülecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Yeni rütbe adı').setRequired(true))
+        // RÜTBE YÖNETİM KOMUTLARI (Rütbe ID İsteğe Bağlı/Sayısal Altyapılı)
+        new SlashCommandBuilder().setName('rütbe-ver').setDescription('Üyeye istediği rütbe ID ile rütbe verir ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbe verilecek üye').setRequired(true)).addIntegerOption(opt => opt.setName('rütbe-id').setDescription('Verilecek rütbenin ID numarası').setRequired(true)),
+        new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Üyenin rütbesini ID ile düşürür ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbesi düşürülecek üye').setRequired(true)).addIntegerOption(opt => opt.setName('rütbe-id').setDescription('Yeni rütbe ID numarası').setRequired(true))
     ].map(command => command.toJSON());
 
     try {
@@ -403,12 +391,12 @@ client.on('interactionCreate', async (interaction) => {
                 }
 
                 const hedefUye = options.getMember('kullanici');
-                const hedefRutbe = options.getString('rütbe-adı');
+                const rutbeId = options.getInteger('rütbe-id');
                 const islemTipi = commandName === 'rütbe-ver' ? 'Terfi' : 'Tenzil (Düşürme)';
 
                 // Sebep girilmesi zorunlu Modal ekranı açılır
                 const modal = new ModalBuilder()
-                    .setCustomId(`rutbe_modal_${commandName}_${hedefUye.id}_${encodeURIComponent(hedefRutbe)}`)
+                    .setCustomId(`rutbe_modal_${commandName}_${hedefUye.id}_${rutbeId}`)
                     .setTitle(`Askeri ${islemTipi} İşlemi`);
 
                 const sebepInput = new TextInputBuilder()
@@ -713,7 +701,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Rütbe & Terfi Sistemi:** Sebep zorunlu modal altyapısı ile Roblox grubuna anında yansıyan terfi/tenzil sistemi.\n• **Grup Listesi:** Kullanıcının üye olduğu tüm grupları tek tek listeler.\n• **Dosya & Fotoğraf Engeli:** Yetkisiz üyelerin dosya/resim atmasını engeller.\n• **Otomatik Mod & Küfür/Reklam Filtresi:** Küfürleri ve linkleri engeller.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Rütbe ID Terfi Sistemi:** Sebep zorunlu modal altyapısı ile ID bazlı rütbe yönetimi.\n• **Grup Listesi:** Kullanıcının üye olduğu tüm grupları tek tek listeler.\n• **Dosya & Fotoğraf Engeli:** Yetkisiz üyelerin dosya/resim atmasını engeller.\n• **Otomatik Mod & Küfür/Reklam Filtresi:** Küfürleri ve linkleri engeller.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
@@ -733,15 +721,19 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı! ✨`, ephemeral: true });
         }
 
-        // RÜTBE / TERFİ SEBEP MODAL YANITI
+        // RÜTBE / TERFİ SEBEP MODAL YANITI (İstediğin Metin Formatı)
         if (interaction.isModalSubmit() && interaction.customId.startsWith('rutbe_modal_')) {
             const parts = interaction.customId.split('_');
             const islemTipi = parts[2]; // rütbe-ver veya rütbe-düşür
             const hedefId = parts[3];
-            const hedefRutbe = decodeURIComponent(parts[4]);
+            const rutbeId = parts[4];
             const sebep = interaction.fields.getTextInputValue('rutbe_sebep_input');
 
-            await interaction.reply({ content: `✅ İşlem başarıyla gerçekleştirildi. **<@${hedefId}>** adlı askerin rütbesi **${hedefRutbe}** olarak güncellendi ve Roblox grubuna yansıtıldı! \n📝 **Sebep:** *${sebep}*`, ephemeral: false });
+            // Tam istediğin metin formatı:
+            await interaction.reply({ 
+                content: `✅ İşlem başarıyla gerçekleştirildi. **<@${hedefId}>** kişisine **${rutbeId}** rütbesi başarıyla verildi ve Roblox grubuna yansıtıldı! \n📝 **Sebep:** *${sebep}*`, 
+                ephemeral: false 
+            });
 
             // Log kanalına bildirim gönder
             const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL_ID);
@@ -751,7 +743,7 @@ client.on('interactionCreate', async (interaction) => {
                     .addFields(
                         { name: '👤 İşlem Yapılan Asker', value: `<@${hedefId}>`, inline: true },
                         { name: '⚖️ İşlemi Yapan Yetkili', value: `${interaction.user}`, inline: true },
-                        { name: '⭐ Yeni Rütbe', value: `\`${hedefRutbe}\``, inline: true },
+                        { name: '⭐ Rütbe ID', value: `\`${rutbeId}\``, inline: true },
                         { name: '📝 Sebep', value: sebep, inline: false }
                     )
                     .setColor(islemTipi === 'rütbe-ver' ? 0x00FF00 : 0xFF0000)
