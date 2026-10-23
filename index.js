@@ -185,6 +185,8 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('adam-çekme-tablosu').setDescription('Kimlerin kaç adam çektiğini gösteren genel yarış tablosunu açar.'),
         new SlashCommandBuilder().setName('profil').setDescription('Kullanıcının detaylı profil ve karalist durumunu gösterir.').addUserOption(opt => opt.setName('kullanici').setDescription('Profili incelenecek üye').setRequired(true)),
         new SlashCommandBuilder().setName('sunucu-bilgi').setDescription('Sunucudaki toplam ve aktif üye sayısını gösterir.'),
+        new SlashCommandBuilder().setName('kick').setDescription('Şüpheli üyeyi sunucudan atar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Atılacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Atılma sebebi').setRequired(false)),
+        new SlashCommandBuilder().setName('ban').setDescription('Kural ihlali yapan üyeyi sunucudan kalıcı yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Yasaklama sebebi').setRequired(false)),
         new SlashCommandBuilder().setName('güvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
         new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.')
@@ -411,7 +413,6 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.editReply({ content: responseText });
             }
 
-            // /sunucu-bilgi Komutu (Toplam ve Aktif Üye Sayısı)
             if (commandName === 'sunucu-bilgi') {
                 const toplamUye = guild.memberCount;
                 const aktifUye = guild.members.cache.filter(m => m.presence && m.presence.status !== 'offline').size;
@@ -427,6 +428,44 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 return interaction.reply({ embeds: [embed], ephemeral: false });
+            }
+
+            // /kick Komutu (Güvenlik Modülü)
+            if (commandName === 'kick') {
+                if (!hasStaffPermission(member)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın!', ephemeral: true });
+                }
+                const hedefUye = options.getMember('kullanici');
+                const sebep = options.getString('sebep') || 'Belirtilmedi';
+
+                if (!hedefUye) {
+                    return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
+                }
+                if (!hedefUye.kickable) {
+                    return interaction.reply({ content: 'Bu üyeyi sunucudan atamam (Yetkim yetmiyor veya benden üst bir yetkili).', ephemeral: true });
+                }
+
+                await hedefUye.kick(sebep);
+                return interaction.reply({ content: `✅ **${hedefUye.user.tag}** sunucudan atıldı. Sebep: *${sebep}*`, ephemeral: false });
+            }
+
+            // /ban Komutu (Güvenlik Modülü)
+            if (commandName === 'ban') {
+                if (!hasStaffPermission(member)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın!', ephemeral: true });
+                }
+                const hedefUye = options.getMember('kullanici');
+                const sebep = options.getString('sebep') || 'Belirtilmedi';
+
+                if (!hedefUye) {
+                    return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
+                }
+                if (!hedefUye.bannable) {
+                    return interaction.reply({ content: 'Bu üyeyi yasaklayamam (Yetkim yetmiyor).', ephemeral: true });
+                }
+
+                await hedefUye.ban({ reason: sebep });
+                return interaction.reply({ content: `🔨 **${hedefUye.user.tag}** sunucudan kalıcı olarak yasaklandı! Sebep: *${sebep}*`, ephemeral: false });
             }
 
             if (commandName === 'adam-çekme') {
@@ -591,11 +630,11 @@ client.on('interactionCreate', async (interaction) => {
             // /bilgi Komutu (İstediğin gibi güncellendi)
             if (commandName === 'bilgi') {
                 const embed = new EmbedBuilder()
-                    .setTitle('TMA Ordusu Botu - Bilgi Sistemi')
+                    .setTitle('TMA Ordusu Botu Bilgi Sistemi')
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '@nesne123', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu Bilgi:** `/sunucu-bilgi` ile anlık toplam ve aktif üye denetimi.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu & Moderasyon:** `/sunucu-bilgi`, `/kick` ve `/ban` komutları.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
