@@ -50,6 +50,9 @@ const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
 
+// Sadece link atabilme izni olan özel rol ID'si
+const LINK_ATABILEN_ROL_ID = '1536812259815202857';
+
 const EGITIM_RUTBE_SIRALAMASI = [
     '1531720879854194873',
     '1531720879007072488',
@@ -250,6 +253,25 @@ client.on("messageCreate", async (message) => {
     const member = message.member;
     const userId = message.author.id;
     const content = normalizeText(message.content);
+    const rawContent = message.content;
+
+    // LİNK KONTROLÜ VE İZİN SİSTEMİ
+    const linkVarMi = rawContent.includes("http://") || rawContent.includes("https://") || rawContent.includes("www.") || rawContent.includes("discord.gg") || rawContent.includes("t.me");
+    if (linkVarMi) {
+        // Eğer mesaj atan kişi yetkili DEĞİLSE ve belirttiğin özel role de sahip DEĞİLSE linki engelle
+        const linkAtabilirMi = hasStaffPermission(member) || member.roles.cache.has(LINK_ATABILEN_ROL_ID);
+        if (!linkAtabilirMi) {
+            try {
+                if (message.deletable) await message.delete();
+                const warningMsg = await message.channel.send({
+                    content: `${message.author}, bu kanalda sadece yetkililer veya özel izinli askerler link paylaşabilir! 🛑`,
+                    allowedMentions: { users: [message.author.id] }
+                });
+                setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
+            } catch (err) {}
+            return;
+        }
+    }
 
     if (message.attachments.size > 0 && !hasStaffPermission(member)) {
         try {
@@ -263,7 +285,7 @@ client.on("messageCreate", async (message) => {
         return;
     }
 
-    const küfürBulundu = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `)) || content.includes('discord gg') || content.includes('https t me');
+    const küfürBulundu = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
     if (küfürBulundu) {
         try {
             if (message.deletable) await message.delete();
@@ -272,7 +294,7 @@ client.on("messageCreate", async (message) => {
             }
 
             const warningMsg = await message.channel.send({
-                content: `${message.author}, uygunsuz dil veya reklam tespiti nedeniyle mesajın silindi ve 3 dakika susturuldun! 🛑🛡️`,
+                content: `${message.author}, uygunsuz dil tespiti nedeniyle mesajın silindi ve 3 dakika susturuldun! 🛑🛡️`,
                 allowedMentions: { users: [message.author.id] }
             });
 
@@ -313,8 +335,6 @@ client.on("messageCreate", async (message) => {
         return;
     }
 });
-
-// HOŞ GELDİN MESAJI EVENT'İ BURADAN TAMAMEN KALDIRILDI
 
 client.on('channelDelete', async (channel) => {
     try {
@@ -836,7 +856,7 @@ client.on('interactionCreate', async (interaction) => {
                     { id: ANA_YETKILI_ROL_2, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
                 ];
 
-                const ticketChannel = theTicketChannel = await guild.channels.create({
+                const ticketChannel = await guild.channels.create({
                     name: `bilet-${safeChannelName(member.user.username)}`,
                     type: ChannelType.GuildText,
                     topic: `TMA_TICKET_OWNER:${member.id}`,
