@@ -42,7 +42,7 @@ const client = new Client({
 // --- ROL VE KANAL ID'LERİ ---
 const YETKILI_ROL_ID = '1533059872655151116';
 const FILM_KANAL_ID = '1563177477289811968';
-const GEListirici_ID = 'nesne123'; // Etiketlenecek kişi
+const GELISTIRICI_ID = 'nesne123';
 
 const ROBLOX_PLACE_ID = '80024713565142';
 const ROBLOX_GROUP_ID = '267214689';
@@ -57,7 +57,6 @@ const BILET_ROLLERI = {
 
 const userSelectedCategory = new Map();
 const securityCommandMap = new Map();
-const guildSecurityStatus = new Map();
 
 // --- FİLM ARŞİVİ ---
 const FILM_ARSIVI = [
@@ -71,10 +70,22 @@ function rastgeleFilmSec() {
     return FILM_ARSIVI[Math.floor(Math.random() * FILM_ARSIVI.length)];
 }
 
+// Belirtilen rolün veya üstünün kontrolü (Discord rol hiyerarşisine göre veya ID ile)
 function hasStaffPermission(member) {
     if (!member) return false;
     if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
-    return member.roles.cache.has(YETKILI_ROL_ID);
+    
+    // Belirtilen ID'ye sahip rolü var mı kontrolü
+    if (member.roles.cache.has(YETKILI_ROL_ID)) return true;
+
+    // Rol hiyerarşisi kontrolü (Belirtilen rolün pozisyonundan yukarıda bir role sahip mi)
+    const targetRole = member.guild.roles.cache.get(YETKILI_ROL_ID);
+    if (targetRole) {
+        const highestMemberRole = member.roles.highest;
+        if (highestMemberRole.position >= targetRole.position) return true;
+    }
+
+    return false;
 }
 
 function canUseCommand(userId, commandName, cooldownMs) {
@@ -148,19 +159,21 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('profil').setDescription('Kullanıcının profilini, avatarını ve durumunu gösterir.').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(false)),
         new SlashCommandBuilder().setName('sunucu-bilgi').setDescription('Sunucu ve aktiflik bilgilerini gösterir.'),
         new SlashCommandBuilder().setName('film-öneri').setDescription('Sinema kanalına rastgele film önerisi gönderir.').addStringOption(opt => opt.setName('isim').setDescription('Film ismi (isteğe bağlı)').setRequired(false)),
-        new SlashCommandBuilder().setName('bilet').setDescription('Destek ve bilet merkezini açar.'),
-        new SlashCommandBuilder().setName('duyuru').setDescription('Sunucu duyurusu yapar.').addChannelOption(opt => opt.setName('kanal').setDescription('Kanal').setRequired(true)).addStringOption(opt => opt.setName('mesaj').setDescription('Duyuru metni').setRequired(true)),
-        new SlashCommandBuilder().setName('rehber').setDescription('Bilgilendirme ve grup rehberini gönderir.'),
+        new SlashCommandBuilder().setName('bilet').setDescription('Destek ve bilet merkezini açar (Sadece yetkili).'),
+        new SlashCommandBuilder().setName('duyuru').setDescription('Sunucu duyurusu yapar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Kanal').setRequired(true)).addStringOption(opt => opt.setName('mesaj').setDescription('Duyuru metni').setRequired(true)),
+        new SlashCommandBuilder().setName('rehber').setDescription('Bilgilendirme ve grup rehberini gönderir (Sadece yetkili).'),
         new SlashCommandBuilder().setName('rütbeler').setDescription('Ordu rütbe listesini gösterir.'),
         new SlashCommandBuilder().setName('grup').setDescription('Roblox grup bağlantısını gösterir.'),
-        new SlashCommandBuilder().setName('ban').setDescription('Üyeyi süreli yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
-        new SlashCommandBuilder().setName('tam-yasakla').setDescription('Üyeyi süresiz tamamen yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
-        new SlashCommandBuilder().setName('at').setDescription('Üyeyi sunucudan atar ve 24 saat engel koyar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
-        new SlashCommandBuilder().setName('güvenlik').setDescription('Üst düzey güvenlik sistemini aktif eder (Yönetici).'),
+        new SlashCommandBuilder().setName('ban').setDescription('Üyeyi süreli yasaklar (Sadece yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
+        new SlashCommandBuilder().setName('tam-yasakla').setDescription('Üyeyi süresiz tamamen yasaklar (Sadece yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
+        new SlashCommandBuilder().setName('at').setDescription('Üyeyi sunucudan atar ve 24 saat engel koyar (Sadece yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Sebep').setRequired(false)),
+        new SlashCommandBuilder().setName('güvenlik').setDescription('Üst düzey güvenlik sistemini aktif eder (Sadece yetkili).'),
         new SlashCommandBuilder().setName('kurallar').setDescription('Sunucu kurallarını gönderir.'),
         new SlashCommandBuilder().setName('oyun-başlat').setDescription('Rus ruleti oyununu başlatır.'),
         new SlashCommandBuilder().setName('grup-liste').setDescription('Roblox kullanıcısının gruplarını sayfa sayfa listeler.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
-        new SlashCommandBuilder().setName('aktiflik-duyuru').setDescription('TMA aktiflik çağrısı yayınlar.').addChannelOption(opt => opt.setName('kanal').setDescription('Kanal').setRequired(true))
+        new SlashCommandBuilder().setName('aktiflik-duyuru').setDescription('TMA aktiflik çağrısı yayınlar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Kanal').setRequired(true)),
+        new SlashCommandBuilder().setName('kanal-kilitle').setDescription('Bulunulan kanalı mesaj yazımına kapatır (Sadece yetkili).'),
+        new SlashCommandBuilder().setName('kanal-aç').setDescription('Kilitli olan kanalı tekrar mesaj yazımına açar (Sadece yetkili).')
     ].map(command => command.toJSON());
 
     try {
@@ -175,7 +188,6 @@ client.on("messageCreate", async (message) => {
 
     const content = message.content.toLowerCase();
 
-    // "sa" / "selam" mesajlarına yanıt sistemi
     if (content === 'sa' || content === 'selam' || content === 'merhaba') {
         await message.reply('As cano hoş geldin nasılsın');
         return;
@@ -194,6 +206,13 @@ client.on('interactionCreate', async (interaction) => {
 
             if (!canUseCommand(interaction.user.id, commandName, 2000)) {
                 return interaction.reply({ content: 'Çok hızlı komut kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
+            }
+
+            // Sadece yetkili izni gerektiren komutların kontrolü
+            const staffOnlyCommands = ['bilet', 'duyuru', 'rehber', 'güvenlik', 'tam-yasakla', 'yasakla', 'aktiflik-duyuru', 'at', 'ban', 'kanal-kilitle', 'kanal-aç'];
+            
+            if (staffOnlyCommands.includes(commandName) && !hasStaffPermission(member)) {
+                return interaction.reply({ content: '❌ Bu komutu kullanmak için yeterli yetkiye sahip değilsin (Gerekli rol: <@&' + YETKILI_ROL_ID + '> ve üstü).', ephemeral: true });
             }
 
             if (commandName === 'aktiflık-sorgu') {
@@ -250,7 +269,7 @@ client.on('interactionCreate', async (interaction) => {
                         { name: '📅 Yayınlanış Tarihi (Yıl)', value: `${film.yil}`, inline: true }
                     )
                     .setColor(0xE50914)
-                    .setThumbnail(film.afis) // Resim sağ tarafta
+                    .setThumbnail(film.afis)
                     .setFooter({ text: `Öneren: ${interaction.user.tag}` })
                     .setTimestamp();
 
@@ -352,7 +371,7 @@ client.on('interactionCreate', async (interaction) => {
             if (commandName === 'bilgi') {
                 const embed = new EmbedBuilder()
                     .setTitle('Bot Bilgi Sistemi')
-                    .setDescription(`Geliştirici / Sahip: @${GEListirici_ID}\n\nBu bot sunucunuzu yönetmek, eğlenceli etkinlikler yapmak ve destek sağlamak için özel olarak geliştirilmiştir.`)
+                    .setDescription(`Geliştirici / Sahip: @${GELISTIRICI_ID}\n\nBu bot sunucunuzu yönetmek, eğlenceli etkinlikler yapmak ve destek sağlamak için özel olarak geliştirilmiştir.`)
                     .setColor(0x3498DB)
                     .setTimestamp();
                 return interaction.reply({ embeds: [embed] });
@@ -387,29 +406,35 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             if (commandName === 'güvenlik') {
-                if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) return interaction.reply({ content: 'Yönetici olmalısın!', ephemeral: true });
                 return interaction.reply({ content: '🛡️ **Üst düzey güvenlik sistemi AKTİF edildi!** Anti-Nuke, Anti-Raid, küfür ve izinsiz bağlantı korumaları devreye sokuldu.' });
             }
 
             if (commandName === 'at') {
-                if (!hasStaffPermission(member)) return interaction.reply({ content: 'Yetkin yok!', ephemeral: true });
                 const hedef = options.getMember('kullanici');
                 await hedef.kick(options.getString('sebep') || 'Belirtilmedi');
                 return interaction.reply({ content: `✅ Üye sunucudan atıldı (24 saat boyunca tekrar katılamaz).` });
             }
 
             if (commandName === 'ban') {
-                if (!hasStaffPermission(member)) return interaction.reply({ content: 'Yetkin yok!', ephemeral: true });
                 const hedef = options.getMember('kullanici');
                 await hedef.ban({ reason: options.getString('sebep') || 'Süreli Yasaklama' });
                 return interaction.reply({ content: `🔨 Üye süreli olarak yasaklandı.` });
             }
 
             if (commandName === 'tam-yasakla') {
-                if (!hasStaffPermission(member)) return interaction.reply({ content: 'Yetkin yok!', ephemeral: true });
                 const hedef = options.getMember('kullanici');
                 await hedef.ban({ reason: options.getString('sebep') || 'Kalıcı Yasaklama' });
                 return interaction.reply({ content: `⚖️ Üye tamamen ve süresiz şekilde yasaklandı!` });
+            }
+
+            if (commandName === 'kanal-kilitle') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.id, { SendMessages: false });
+                return interaction.reply({ content: '🔒 Bu kanal üyelerin mesaj yazmasına kapatıldı (Kilitlendi).' });
+            }
+
+            if (commandName === 'kanal-aç') {
+                await interaction.channel.permissionOverwrites.edit(interaction.guild.id, { SendMessages: null });
+                return interaction.reply({ content: '🔓 Bu kanal tekrar üyelerin mesaj yazmasına açıldı.' });
             }
 
             if (commandName === 'aktiflik-duyuru') {
@@ -427,7 +452,6 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.editReply({ content: `❌ ${username} adına kayıtlı grup bulunamadı.` });
                 }
 
-                // Sayfa başına 10 grup
                 const groups = result.groups;
                 const pageSize = 10;
                 const totalPages = Math.ceil(groups.length / pageSize);
@@ -487,7 +511,6 @@ client.on('interactionCreate', async (interaction) => {
 
             await interaction.deferReply({ ephemeral: true });
             
-            // İlgili rollere izin verme
             let rolePermissionOverwrites = BILET_ROLLERI[cat].map(roleId => ({
                 id: roleId,
                 allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
