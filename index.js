@@ -13,8 +13,6 @@ const {
     Routes
 } = require('discord.js');
 
-const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
-
 const express = require('express');
 const https = require('https');
 
@@ -37,8 +35,7 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildPresences
     ]
 });
 
@@ -197,8 +194,7 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('yasakla').setDescription('Kural ihlali yapan üyeyi sunucudan kalıcı yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Yasaklama sebebi').setRequired(false)),
         new SlashCommandBuilder().setName('guvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
         new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
-        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.'),
-        new SlashCommandBuilder().setName('ses-katıl').setDescription('Botu belirtilen ses kanalına bağlar ve ses yönetim panelini açar (Yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Bağlanılacak ses kanalı').addChannelTypes(ChannelType.GuildVoice).setRequired(true))
+        new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.')
     ].map(command => command.toJSON());
 
     try {
@@ -384,37 +380,6 @@ client.on('interactionCreate', async (interaction) => {
 
             if (!canUseCommand(interaction.user.id, commandName, SECURITY.COMMAND_COOLDOWN_MS)) {
                 return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
-            }
-
-            if (commandName === 'ses-katıl') {
-                if (!hasStaffPermission(member)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
-                }
-                const voiceChannel = options.getChannel('kanal');
-                
-                try {
-                    joinVoiceChannel({
-                        channelId: voiceChannel.id,
-                        guildId: guild.id,
-                        adapterCreator: guild.voiceAdapterCreator,
-                    });
-
-                    const embed = new EmbedBuilder()
-                        .setTitle('🔊 TMA Ses Karargâhı Yönetim Paneli')
-                        .setDescription(`Bot başarıyla **${voiceChannel.name}** kanalına katıldı!\nAşağıdaki butonları kullanarak ses odasını yönetebilirsin.`)
-                        .setColor(0x3498DB)
-                        .setTimestamp();
-
-                    const row = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`vc_lock_${voiceChannel.id}`).setLabel('Ses Kilit').setStyle(ButtonStyle.Danger).setEmoji('🔒'),
-                        new ButtonBuilder().setCustomId(`vc_mute_${voiceChannel.id}`).setLabel('Sustur').setStyle(ButtonStyle.Secondary).setEmoji('🔇'),
-                        new ButtonBuilder().setCustomId(`vc_kickall_${voiceChannel.id}`).setLabel('Kapat (At)').setStyle(ButtonStyle.Danger).setEmoji('🚪')
-                    );
-
-                    return interaction.reply({ embeds: [embed], components: [row], ephemeral: false });
-                } catch (error) {
-                    return interaction.reply({ content: 'Ses kanalına bağlanırken bir hata oluştu!', ephemeral: true });
-                }
             }
 
             if (commandName === 'duyuru') {
@@ -690,7 +655,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Ses Yönetim Paneli:** `/ses-katıl` ile sese girip kilit, susturma ve oda kapatma yönetimi.\n• **Dosya & Fotoğraf Engeli:** Yetkisiz üyelerin dosya/resim atmasını engeller.\n• **Otomatik Mod & Küfür/Reklam Filtresi:** Küfürleri ve linkleri engeller.\n• **Nükleer Karşıtı (Anti-Nuke):** Kanal ve rol silinmelerine karşı koruma sağlar.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer gizliliği.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Dosya & Fotoğraf Engeli:** Yetkisiz üyelerin dosya/resim atmasını engeller.\n• **Otomatik Mod & Küfür/Reklam Filtresi:** Küfürleri ve linkleri engeller.\n• **Nükleer Karşıtı (Anti-Nuke):** Kanal ve rol silinmelerine karşı koruma sağlar.\n• **Giriş Kapısı & Baskın Koruması:** Şüpheli girişleri izler.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer gizliliği.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
@@ -708,54 +673,6 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı! ✨`, ephemeral: true });
-        }
-
-        // SES YÖNETİM BUTONLARI
-        if (interaction.isButton()) {
-            const [action, type, channelId] = interaction.customId.split('_');
-            if (action === 'vc') {
-                if (!hasStaffPermission(interaction.member)) {
-                    return interaction.reply({ content: 'Bu ses komutunu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
-                }
-
-                const channel = interaction.guild.channels.cache.get(channelId);
-                if (!channel || channel.type !== ChannelType.GuildVoice) {
-                    return interaction.reply({ content: 'Ses kanalı bulunamadı veya silinmiş!', ephemeral: true });
-                }
-
-                if (type === 'lock') {
-                    // Ses Kilit: Kimse girememesi için @everyone izinlerinden bağlanma hakkını kapatır
-                    await channel.permissionOverwrites.edit(interaction.guild.id, { Connect: false });
-                    return interaction.reply({ content: `🔒 **${channel.name}** ses kanalı kilitlendi! Artık kimse giremez.`, ephemeral: true });
-                }
-
-                if (type === 'mute') {
-                    // Sustur: Odadaki herkesin sesini kapatır
-                    let mutedCount = 0;
-                    channel.members.forEach(async (member) => {
-                        if (!member.user.bot && member.voice.serverMute === false) {
-                            await member.voice.setMute(true).catch(() => {});
-                            mutedCount++;
-                        }
-                    });
-                    return interaction.reply({ content: `🔇 **${channel.name}** odasındaki ${mutedCount} kişinin sesi susturuldu!`, ephemeral: true });
-                }
-
-                if (type === 'kickall') {
-                    // Kapat (At): Odadaki herkesi odadan atar ve botu sesten çıkarır
-                    let kickedCount = 0;
-                    channel.members.forEach(async (member) => {
-                        if (!member.user.bot) {
-                            await member.voice.disconnect().catch(() => {});
-                            kickedCount++;
-                        }
-                    });
-                    const connection = getVoiceConnection(interaction.guild.id);
-                    if (connection) connection.destroy();
-
-                    return interaction.reply({ content: `🚪 **${channel.name}** odası kapatıldı, ${kickedCount} kişi odadan atıldı ve bot sesten ayrıldı!`, ephemeral: true });
-                }
-            }
         }
 
         if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
