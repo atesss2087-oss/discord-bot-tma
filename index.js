@@ -34,7 +34,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences
     ]
 });
 
@@ -141,7 +142,6 @@ function getRobloxPlayerCount() {
     });
 }
 
-// Roblox Kullanıcı ID Bulma ve Grup Listesi Çekme Fonksiyonları
 function getRobloxUserGroups(username) {
     return new Promise((resolve) => {
         const searchUrl = `https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(username)}&limit=10`;
@@ -155,7 +155,6 @@ function getRobloxUserGroups(username) {
                     const userId = json.data[0].id;
                     const realUsername = json.data[0].name;
 
-                    // Grupları çek
                     const groupsUrl = `https://groups.roblox.com/v1/users/${userId}/groups/roles`;
                     https.get(groupsUrl, (gRes) => {
                         let gData = '';
@@ -185,8 +184,9 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('adam-çekme').setDescription('Üyenin çektiği adam sayısını kaydeder (Özel yetki gerekir).').addUserOption(opt => opt.setName('kullanici').setDescription('Adamı çeken yetkili üye').setRequired(true)),
         new SlashCommandBuilder().setName('adam-çekme-tablosu').setDescription('Kimlerin kaç adam çektiğini gösteren genel yarış tablosunu açar.'),
         new SlashCommandBuilder().setName('profil').setDescription('Kullanıcının detaylı profil ve karalist durumunu gösterir.').addUserOption(opt => opt.setName('kullanici').setDescription('Profili incelenecek üye').setRequired(true)),
+        new SlashCommandBuilder().setName('sunucu-bilgi').setDescription('Sunucudaki toplam ve aktif üye sayısını gösterir.'),
         new SlashCommandBuilder().setName('güvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
-        new SlashCommandBuilder().setName('bilgi').setDescription('Botun tüm yeteneklerini ve komutlarını profesyonel rehber olarak gösterir.'),
+        new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.')
     ].map(command => command.toJSON());
 
@@ -227,13 +227,11 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
-    // Seviye ve Mesaj Sistemi (200 mesaj sınırı ve seviye atlama duyurusu)
     const currentCount = userMessageCounts.get(userId) || 0;
     if (currentCount < 200) {
         userMessageCounts.set(userId, currentCount + 1);
         const yeniSayi = currentCount + 1;
         
-        // Her 10 mesajda bir seviye atlama kontrolü (örnek: 10. mesajda Seviye 2)
         if (yeniSayi > 1 && yeniSayi % 10 === 0) {
             const yeniSeviye = Math.floor(yeniSayi / 10) + 1;
             await message.channel.send({
@@ -393,7 +391,6 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle!', ephemeral: true });
             }
 
-            // /grup-liste Komutu (Fotodaki Roblox grup sorgulama ekranı)
             if (commandName === 'grup-liste') {
                 const username = options.getString('kullaniciadi');
                 await interaction.deferReply();
@@ -412,6 +409,24 @@ client.on('interactionCreate', async (interaction) => {
                 });
 
                 return interaction.editReply({ content: responseText });
+            }
+
+            // /sunucu-bilgi Komutu (Toplam ve Aktif Üye Sayısı)
+            if (commandName === 'sunucu-bilgi') {
+                const toplamUye = guild.memberCount;
+                const aktifUye = guild.members.cache.filter(m => m.presence && m.presence.status !== 'offline').size;
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`📊 ${guild.name} — Sunucu İstatistikleri`)
+                    .addFields(
+                        { name: '👥 Toplam Üye', value: `${toplamUye} Asker`, inline: true },
+                        { name: '🟢 Aktif (Çevrim İçi) Üye', value: `${aktifUye} Asker`, inline: true }
+                    )
+                    .setColor(0x3498DB)
+                    .setThumbnail(guild.iconURL({ dynamic: true }))
+                    .setTimestamp();
+
+                return interaction.reply({ embeds: [embed], ephemeral: false });
             }
 
             if (commandName === 'adam-çekme') {
@@ -573,15 +588,14 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
 
+            // /bilgi Komutu (İstediğin gibi güncellendi)
             if (commandName === 'bilgi') {
                 const embed = new EmbedBuilder()
-                    .setTitle('🛡️ TMA Elite Bot — Profesyonel Sistem Rehberi')
-                    .setDescription('Bu bot Turkish Modern Army sunucunuzu en üst düzeyde korumak, yönetmek ve topluluk içi rekabeti zirveye taşımak için özel olarak kodlanmıştır.')
+                    .setTitle('TMA Ordusu Botu - Bilgi Sistemi')
+                    .setThumbnail(TMA_LOGO_URL)
                     .addFields(
-                        { name: '⚡ Gelişmiş Güvenlik ve Moderasyon', value: '• **Spam Koruması:** Sınır aşımında anlık susturma ve log bildirimi.\n• **Küfür Filtresi:** Genişletilmiş filtre havuzu, sessiz kullanıcı uyarısı ve herkese açık log/mute bildirim mekanizması.' },
-                        { name: '🎫 Kategori Bazlı Destek Sistemi', value: '• Mod, Reklam, Oyun, Gamepass, Geri Dönüş ve Transfer biletleri.\n• **Transfer Bileti Gizliliği:** Sadece özel transfer rolü ve yöneticiler görebilir, etiketleme yapılmaz.' },
-                        { name: '🎮 Roblox & Askeri Komutlar', value: '• `/grup`, `/grup-liste`, `/rütbeler`, `/aktiflik-sorgu`, `/profil` komutları.\n• **Adam Çekme Yarışı:** `/adam-çekme` ve herkesin erişebildiği `/adam-çekme-tablosu`.' },
-                        { name: '📊 Seviye ve Yarış Sistemi', value: '• 200 mesaj sınırlı, XP ve seviye atlamalı TMA mesaj yarış tablosu ve seviye atlama duyuruları (`/seviye-tablosu`).' }
+                        { name: '👑 Geliştirici / Sahip', value: '@nesne123', inline: false },
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu Bilgi:** `/sunucu-bilgi` ile anlık toplam ve aktif üye denetimi.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
