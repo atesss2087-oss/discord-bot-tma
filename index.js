@@ -176,21 +176,22 @@ function getRobloxUserGroups(username) {
 client.once('ready', async () => {
     console.log(`TMA Elite Bot çevrimiçi ve güvenli modda: ${client.user.tag}`);
 
+    // Sadece tamamen Türkçe ve düzenlenmiş komutlar kayıt ediliyor
     const commands = [
         new SlashCommandBuilder().setName('bilet').setDescription('TMA Destek ve Bilet merkezini açar (Sadece yetkililer).'),
         new SlashCommandBuilder().setName('grup').setDescription('Resmi Roblox grup bağlantısını gösterir.'),
         new SlashCommandBuilder().setName('grup-liste').setDescription('Roblox kullanıcısının üye olduğu grupları ve rütbelerini gösterir.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
         new SlashCommandBuilder().setName('roblox-profil').setDescription('Roblox kullanıcısının detaylı profil ve avatar bilgilerini gösterir.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
         new SlashCommandBuilder().setName('duyuru').setDescription('TMA temalı resmi karargâh duyurusu yayınlar (Yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Duyurunun atılacağı kanal').setRequired(true)).addStringOption(opt => opt.setName('mesaj').setDescription('Duyuru metni').setRequired(true)),
-        new SlashCommandBuilder().setName('rütbeler').setDescription('TMA kademe ve rütbe listesini gösterir.'),
+        new SlashCommandBuilder().setName('rutbeler').setDescription('TMA kademe ve rütbe listesini gösterir.'),
         new SlashCommandBuilder().setName('seviye-tablosu').setDescription('TMA mesaj ve seviye yarış tablosunu gösterir (200 mesaj sınırı).'),
-        new SlashCommandBuilder().setName('adam-çekme').setDescription('Üyenin çektiği adam sayısını kaydeder (Özel yetki gerekir).').addUserOption(opt => opt.setName('kullanici').setDescription('Adamı çeken yetkili üye').setRequired(true)),
-        new SlashCommandBuilder().setName('adam-çekme-tablosu').setDescription('Kimlerin kaç adam çektiğini gösteren genel yarış tablosunu açar.'),
+        new SlashCommandBuilder().setName('adam-ceke').setDescription('Üyenin çektiği adam sayısını kaydeder (Özel yetki gerekir).').addUserOption(opt => opt.setName('kullanici').setDescription('Adamı çeken yetkili üye').setRequired(true)),
+        new SlashCommandBuilder().setName('adam-ceke-tablosu').setDescription('Kimlerin kaç adam çektiğini gösteren genel yarış tablosunu açar.'),
         new SlashCommandBuilder().setName('profil').setDescription('Kullanıcının detaylı profil ve karalist durumunu gösterir.').addUserOption(opt => opt.setName('kullanici').setDescription('Profili incelenecek üye').setRequired(true)),
         new SlashCommandBuilder().setName('sunucu-bilgi').setDescription('Sunucudaki toplam ve aktif üye sayısını gösterir.'),
-        new SlashCommandBuilder().setName('kick').setDescription('Şüpheli üyeyi sunucudan atar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Atılacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Atılma sebebi').setRequired(false)),
-        new SlashCommandBuilder().setName('ban').setDescription('Kural ihlali yapan üyeyi sunucudan kalıcı yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Yasaklama sebebi').setRequired(false)),
-        new SlashCommandBuilder().setName('güvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
+        new SlashCommandBuilder().setName('at').setDescription('Şüpheli üyeyi sunucudan atar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Atılacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Atılma sebebi').setRequired(false)),
+        new SlashCommandBuilder().setName('yasakla').setDescription('Kural ihlali yapan üyeyi sunucudan kalıcı yasaklar (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Yasaklanacak üye').setRequired(true)).addStringOption(opt => opt.setName('sebep').setDescription('Yasaklama sebebi').setRequired(false)),
+        new SlashCommandBuilder().setName('guvenlik').setDescription('Güvenlik modülünü açar veya kapatır (Yönetici).').addStringOption(opt => opt.setName('durum').setDescription('Aktif veya inaktif seçin').setRequired(true).addChoices({ name: 'Aktif', value: 'aktif' }, { name: 'İnaktif', value: 'inaktif' })),
         new SlashCommandBuilder().setName('bilgi').setDescription('TMA Ordusu Botu bilgi sistemini ve özelliklerini gösterir.'),
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.')
     ].map(command => command.toJSON());
@@ -199,7 +200,7 @@ client.once('ready', async () => {
         if (!process.env.DISCORD_TOKEN) throw new Error('DISCORD_TOKEN environment değişkeni eksik!');
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('TMA Elite Slash komutları başarıyla senkronize edildi.');
+        console.log('TMA Elite Türkçe Slash komutları başarıyla senkronize edildi.');
     } catch (error) { console.error('Komut kayıt hatası:', error); }
 });
 
@@ -232,7 +233,7 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
-    // SADECE 1563106780827877386 ID'li kanalda otomatik sohbet ve küfür kontrolü çalışır
+    // Sadece 1563106780827877386 ID'li kanalda otomatik sohbet ve küfür kontrolü çalışır
     if (message.channel.id === BOT_SOHBET_CHANNEL_ID) {
         const küfürVarMi = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
         if (küfürVarMi) {
@@ -498,7 +499,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ embeds: [embed], ephemeral: false });
             }
 
-            if (commandName === 'kick') {
+            if (commandName === 'at') {
                 if (!hasStaffPermission(member)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
                 }
@@ -516,7 +517,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: `✅ **${hedefUye.user.tag}** sunucudan atıldı. Sebep: *${sebep}* 🚪`, ephemeral: false });
             }
 
-            if (commandName === 'ban') {
+            if (commandName === 'yasakla') {
                 if (!hasStaffPermission(member)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
                 }
@@ -534,7 +535,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: `🔨 **${hedefUye.user.tag}** sunucudan kalıcı olarak yasaklandı! Sebep: *${sebep}* ⚖️`, ephemeral: false });
             }
 
-            if (commandName === 'adam-çekme') {
+            if (commandName === 'adam-ceke') {
                 if (!hasAdamCekmePermission(member)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için gerekli ordu izinlerine sahip değilsin! 🛑', ephemeral: true });
                 }
@@ -551,7 +552,7 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
-            if (commandName === 'adam-çekme-tablosu') {
+            if (commandName === 'adam-ceke-tablosu') {
                 const sortedCekenler = Array.from(adamCekmeCounts.entries())
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 10);
@@ -609,7 +610,7 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
-            if (commandName === 'rütbeler') {
+            if (commandName === 'rutbeler') {
                 const rutbeMetni = 
                     `***TMA RESMİ KADEME VE RÜTBE LİSTESİ*** 🎖️\n` +
                     `- OR-1 Er | OR-2 Onbaşı | OR-3 Uzman Onbaşı\n` +
@@ -679,7 +680,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ embeds: [embed], ephemeral: false });
             }
 
-            if (commandName === 'güvenlik') {
+            if (commandName === 'guvenlik') {
                 if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                     return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın! 🛑', ephemeral: true });
                 }
@@ -699,7 +700,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste`, `/roblox-profil` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu & Moderasyon:** `/sunucu-bilgi`, `/duyuru`, `/kick` ve `/ban` komutları.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste`, `/roblox-profil` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-ceke` ve herkese açık `/adam-ceke-tablosu`.\n• **Sunucu & Moderasyon:** `/sunucu-bilgi`, `/duyuru`, `/at` ve `/yasakla` komutları.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
