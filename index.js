@@ -49,6 +49,7 @@ const TRANSFER_BILET_ROL_ID = '1531720791723610352';
 const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
+const FILM_KANAL_ID = '1563177477289811968';
 
 // Sadece link atabilme izni olan özel rol ID'si
 const LINK_ATABILEN_ROL_ID = '1536812259815202857';
@@ -100,6 +101,20 @@ const guildSecurityStatus = new Map();
 const userMessageCounts = new Map();
 const adamCekmeCounts = new Map();
 const recentJoins = [];
+
+// Örnek zengin film arşivi (Komedi, Korku, Dram, Savaş vb.)
+const FILM_LISTESI = [
+    { baslik: "Hababam Sınıfı", tur: "Komedi / Klasik", yil: 1975, puan: "9.3/10", konu: "Özel Çamlıca Lisesi'ne yeni gelen müdür muavini Mahmut Hoca ile hayatı neşe ve haylazlıkla geçiren öğrencilerin maceraları." },
+    { baslik: "Dağ II", tur: "Savaş / Aksiyon / Dram", yil: 2016, puan: "8.8/10", konu: "Irak'ın kuzeyindeki bir operasyonda IŞİD çetelerinin eline düşen Türk gazeteciyi kurtarmaya giden Özel Kuvvetler 8. Muharebe Arama Kurtarma Timi'nin (ÖKK - MAK) destansı hikayesi." },
+    { baslik: "The Dark Knight", tur: "Aksiyon / Suç / Dram", yil: 2008, puan: "9.0/10", konu: "Batman, Gotham şehrini kalbinden vurmak isteyen psikopatik suç dehası Joker'e karşı zorlu bir adalet mücadelesi verir." },
+    { baslik: "Kutsal Damacana", tur: "Komedi", yil: 2007, puan: "7.1/10", konu: "Fakir bir hayat süren Fikret'in, trajikomik olaylar zinciri sonucunda katolik kilisesine papaz olarak sızmasıyla başlayan absürt maceraları." },
+    { baslik: "The Conjuring (Korku Seansı)", tur: "Korku / Gizem", yil: 2013, puan: "7.5/10", konu: "Yeni taşındıkları çiftlik evinde karanlık ve korkunç varlıkların tehdidine uğrayan Perron ailesine yardım etmeye çalışan paranormal araştırmacılar Ed ve Lorraine Warren." },
+    { baslik: "Ayla", tur: "Dram / Savaş / Tarih", yil: 2017, puan: "8.3/10", konu: "Kore Savaşı'nda astsubay olan Süleyman Dilbirliği'nin savaş meydanında bulduğu ve Ayla adını verdiği küçük Koreli kızla kurduğu gerçeğe dayanan yürek burkan bağ." }
+];
+
+function rastgeleFilmSec() {
+    return FILM_LISTESI[Math.floor(Math.random() * FILM_LISTESI.length)];
+}
 
 function hasStaffPermission(member) {
     if (!member) return false;
@@ -214,7 +229,10 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('aktiflik-sorgu').setDescription('Roblox oyunundaki anlık aktif oyuncu sayısını gösterir.'),
         new SlashCommandBuilder().setName('rütbe-ver').setDescription('Üyeye rütbe adı ile rütbe verir ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbe verilecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Verilecek rütbe adı').setRequired(true)),
         new SlashCommandBuilder().setName('rütbe-düşür').setDescription('Üyenin rütbesini ad ile düşürür ve roblox grubuna yansıtır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Rütbesi düşürülecek üye').setRequired(true)).addStringOption(opt => opt.setName('rütbe-adı').setDescription('Yeni rütbe adı').setRequired(true)),
-        new SlashCommandBuilder().setName('egitim-terfi').setDescription('Eğitime giren askerin rütbesini 1 kademe yukarı taşır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Eğitimdeki asker').setRequired(true))
+        new SlashCommandBuilder().setName('egitim-terfi').setDescription('Eğitime giren askerin rütbesini 1 kademe yukarı taşır (Yetkili).').addUserOption(opt => opt.setName('kullanici').setDescription('Eğitimdeki asker').setRequired(true)),
+        
+        // YENİ FİLM ÖNERİ KOMUTU
+        new SlashCommandBuilder().setName('film').setDescription('Belirlenen özel kanala rastgele harika bir film önerisi gönderir.')
     ].map(command => command.toJSON());
 
     try {
@@ -255,10 +273,8 @@ client.on("messageCreate", async (message) => {
     const content = normalizeText(message.content);
     const rawContent = message.content;
 
-    // LİNK KONTROLÜ VE İZİN SİSTEMİ
     const linkVarMi = rawContent.includes("http://") || rawContent.includes("https://") || rawContent.includes("www.") || rawContent.includes("discord.gg") || rawContent.includes("t.me");
     if (linkVarMi) {
-        // Eğer mesaj atan kişi yetkili DEĞİLSE ve belirttiğin özel role de sahip DEĞİLSE linki engelle
         const linkAtabilirMi = hasStaffPermission(member) || member.roles.cache.has(LINK_ATABILEN_ROL_ID);
         if (!linkAtabilirMi) {
             try {
@@ -377,6 +393,26 @@ client.on('interactionCreate', async (interaction) => {
 
             if (!canUseCommand(interaction.user.id, commandName, SECURITY.COMMAND_COOLDOWN_MS)) {
                 return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
+            }
+
+            // FİLM ÖNERİ KOMUTU (Belirtilen kanala film önerisi atar)
+            if (commandName === 'film') {
+                const hedefKanal = guild.channels.cache.get(FILM_KANAL_ID);
+                if (!hedefKanal) {
+                    return interaction.reply({ content: '❌ Film öneri kanalı sistemde bulunamadı!', ephemeral: true });
+                }
+
+                const secilenFilm = rastgeleFilmSec();
+                const embed = new EmbedBuilder()
+                    .setTitle(`🎬 TMA Sinema Kulübü — ${secilenFilm.baslik}`)
+                    .setDescription(`> **Konu:** ${secilenFilm.konu}\n\n🍿 **Tür:** ${secilenFilm.tur}\n⭐ **Puan:** ${secilenFilm.puan}\n📅 **Yıl:** ${secilenFilm.yil}`)
+                    .setColor(0xE50914)
+                    .setImage(TMA_LOGO_URL)
+                    .setFooter({ text: `Öneren: ${interaction.user.tag}` })
+                    .setTimestamp();
+
+                await hedefKanal.send({ embeds: [embed] });
+                return interaction.reply({ content: `✅ Rastgele film önerisi başarıyla <#${FILM_KANAL_ID}> kanalına gönderildi! 🍿`, ephemeral: true });
             }
 
             if (commandName === 'egitim-terfi') {
@@ -752,7 +788,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
                         { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Eğitim Terfi Sistemi:** Eğitimdeki askerleri otomatik 1 kademe üst role taşır.\n• **Rütbe Adı Terfi Sistemi:** Sebep zorunlu modal altyapısı ile rütbe yönetimi.\n• **Grup Listesi:** Kullanıcının üye olduğu tüm grupları tek tek listeler.\n• **Güvenlik & Korumalar:** Anti-Nuke, Anti-Raid ve Küfür filtresi.' }
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Film Öneri Sistemi:** Belirlenen kanala komutla rastgele sinema, komedi ve korku filmi önerir.\n• **Eğitim Terfi Sistemi:** Eğitimdeki askerleri otomatik 1 kademe üst role taşır.\n• **Rütbe Adı Terfi Sistemi:** Sebep zorunlu modal altyapısı ile rütbe yönetimi.\n• **Güvenlik & Korumalar:** Anti-Nuke, Anti-Raid ve Link filtresi.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
