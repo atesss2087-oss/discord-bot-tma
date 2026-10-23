@@ -326,7 +326,7 @@ client.on('interactionCreate', async (interaction) => {
                         { name: '📅 Yayın Yılı', value: `${film.yil}`, inline: true }
                     )
                     .setColor(0xE50914)
-                    .setThumbnail(film.afis) // Afiş sağ tarafta
+                    .setThumbnail(film.afis)
                     .setFooter({ text: `Öneren Asker: ${interaction.user.tag}` })
                     .setTimestamp();
 
@@ -382,7 +382,7 @@ client.on('interactionCreate', async (interaction) => {
                 return;
             }
 
-            // --- RÜTBE VER / DÜŞÜR MODAL ---
+            // --- RÜTbe VER / DÜŞÜR MODAL ---
             if (commandName === 'rütbe-ver' || commandName === 'rütbe-düşür') {
                 if (!hasStaffPermission(member)) return interaction.reply({ content: 'Yetkili olmalısın! 🛑', ephemeral: true });
 
@@ -443,7 +443,9 @@ client.on('interactionCreate', async (interaction) => {
                 const username = options.getString('kullaniciadi');
                 await interaction.deferReply();
                 const result = await getRobloxUserGroups(username);
-                if (!result || !result.groups.length) return.interaction.editReply({ content: `❌ Grup bulunamadı.` });
+                if (!result || !result.groups || result.groups.length === 0) {
+                    return interaction.editReply({ content: `❌ Grup bulunamadı.` });
+                }
 
                 let text = `**${result.username}** grupları (${result.groups.length}):\n\n`;
                 result.groups.forEach((g, i) => { text += `**${i+1}. ${g.group.name}** — \`${g.role.name}\`\n`; });
