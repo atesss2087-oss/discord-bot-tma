@@ -47,6 +47,7 @@ const ADAM_CEKME_IZIN_ROL_1 = '1532129489495130233';
 const ADAM_CEKME_IZIN_ROL_2 = '1536813298811535501';
 const LOG_CHANNEL_ID = '1562784881140961281';
 const HOS_GELDIN_CHANNEL_ID = '1531721112730210374';
+const BOT_SOHBET_CHANNEL_ID = '1563106780827877386'; // Sadece bu kanalda otomatik sohbet aktif olacak
 
 const BILET_ROLLERI = {
     moderator_bilet: '1533064202950807712',
@@ -162,7 +163,7 @@ function getRobloxUserGroups(username) {
                         gRes.on('end', () => {
                             try {
                                 const gJson = JSON.parse(gData);
-                                resolve({ username: realUsername, groups: gJson.data || [] });
+                                resolve({ userId, username: realUsername, groups: gJson.data || [] });
                             } catch (e) { resolve(null); }
                         });
                     }).on('error', () => resolve(null));
@@ -179,6 +180,8 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('bilet').setDescription('TMA Destek ve Bilet merkezini açar (Sadece yetkililer).'),
         new SlashCommandBuilder().setName('grup').setDescription('Resmi Roblox grup bağlantısını gösterir.'),
         new SlashCommandBuilder().setName('grup-liste').setDescription('Roblox kullanıcısının üye olduğu grupları ve rütbelerini gösterir.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
+        new SlashCommandBuilder().setName('roblox-profil').setDescription('Roblox kullanıcısının detaylı profil ve avatar bilgilerini gösterir.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
+        new SlashCommandBuilder().setName('duyuru').setDescription('TMA temalı resmi karargâh duyurusu yayınlar (Yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Duyurunun atılacağı kanal').setRequired(true)).addStringOption(opt => opt.setName('mesaj').setDescription('Duyuru metni').setRequired(true)),
         new SlashCommandBuilder().setName('rütbeler').setDescription('TMA kademe ve rütbe listesini gösterir.'),
         new SlashCommandBuilder().setName('seviye-tablosu').setDescription('TMA mesaj ve seviye yarış tablosunu gösterir (200 mesaj sınırı).'),
         new SlashCommandBuilder().setName('adam-çekme').setDescription('Üyenin çektiği adam sayısını kaydeder (Özel yetki gerekir).').addUserOption(opt => opt.setName('kullanici').setDescription('Adamı çeken yetkili üye').setRequired(true)),
@@ -229,6 +232,42 @@ client.on("messageCreate", async (message) => {
     const userId = message.author.id;
     const content = normalizeText(message.content);
 
+    // SADECE BELİRTTİĞİN ÖZEL KANALDA OTOMATİK SOHBET VE KÜFÜR KONTROLÜ
+    if (message.channel.id === BOT_SOHBET_CHANNEL_ID) {
+        const küfürVarMi = normalizedBadWords.some(word => (` ${content} `).includes(` ${word} `));
+        if (küfürVarMi) {
+            try {
+                if (message.deletable) await message.delete();
+                const warningMsg = await message.channel.send({
+                    content: `✨ Saygıdeğer askerimiz ${message.author}, karargâhımızın bu nezih kanalında lütfen daha özenli ve kibar bir dil kullanalım! 🛑🛡️`,
+                    allowedMentions: { users: [message.author.id] }
+                });
+                setTimeout(() => { warningMsg.delete().catch(() => {}); }, SECURITY.WARNING_DELETE_MS);
+            } catch (err) {}
+            return;
+        }
+
+        if (content.includes('merhaba') || content.includes('selam') || content === 'sa') {
+            await message.reply('Aleykümselam, TMA karargâhına hoş geldin! Nasılsın bugün asker? 🫡✨');
+            return;
+        }
+        if (content.includes('nasılsın') || content.includes('nasilsin') || content.includes('ne yapıyon') || content.includes('ne yapiyon')) {
+            await message.reply('Çok teşekkür ederim, ordumuz için çalışmaya ve nöbet tutmaya devam ediyorum! Sen nasılsın bakalım? 🚀🎖️');
+            return;
+        }
+        if (content.includes('iyi') || content.includes('süper') || content.includes('kralsın') || content.includes('kralsin')) {
+            await message.reply('Sağ olasın var olasın! Seninle beraber ordumuz daha da güçlü asker! 🌟💪');
+            return;
+        }
+        if (content.includes('teşekkür') || content.includes('tesekkur') || content.includes('eyvallah')) {
+            await message.reply('Rica ederim, ne demek her zaman emrindeyiz! 🛡️🤝');
+            return;
+        }
+        
+        await message.reply('Anlaşıldı asker, emrindeyiz! Karargâhta her şey yolunda ve kontrolümüz altında. 🫡🚀');
+        return;
+    }
+
     const currentCount = userMessageCounts.get(userId) || 0;
     if (currentCount < 200) {
         userMessageCounts.set(userId, currentCount + 1);
@@ -237,23 +276,10 @@ client.on("messageCreate", async (message) => {
         if (yeniSayi > 1 && yeniSayi % 10 === 0) {
             const yeniSeviye = Math.floor(yeniSayi / 10) + 1;
             await message.channel.send({
-                content: `🎉 Tebrikler ${message.author}, Seviye ${yeniSeviye}'e yükseldin!`,
+                content: `🎉 Tebrikler ${message.author}, Seviye ${yeniSeviye}'e yükseldin! Devam et asker! 🚀`,
                 allowedMentions: { users: [message.author.id] }
             }).catch(() => {});
         }
-    }
-
-    if (content === 'merhaba' || content === 'selam') {
-        await message.reply('meraba cano nasılsın');
-        return;
-    }
-    if (content.includes('iyiyim sen')) {
-        await message.reply('bende çok iyiyim çok teşekkür ederim cano');
-        return;
-    }
-    if (content === 'sa' || content === 's a' || content === 's.a') {
-        await message.reply('Aleykümselam, hoşgeldin.');
-        return;
     }
 
     const now = Date.now();
@@ -298,7 +324,7 @@ client.on("messageCreate", async (message) => {
             }
 
             const warningMsg = await message.channel.send({
-                content: `${message.author}, uygunsuz dil kullanımı nedeniyle mesajın silindi ve 3 dakika susturuldun. 🛑`,
+                content: `${message.author}, uygunsuz dil kullanımı nedeniyle mesajın silindi ve 3 dakika susturuldun. Lütfen daha dikkatli olalım! 🛑`,
                 allowedMentions: { users: [message.author.id] }
             });
 
@@ -390,7 +416,49 @@ client.on('interactionCreate', async (interaction) => {
             const { commandName, options, guild, member } = interaction;
 
             if (!canUseCommand(interaction.user.id, commandName, SECURITY.COMMAND_COOLDOWN_MS)) {
-                return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle!', ephemeral: true });
+                return interaction.reply({ content: 'Komutları arka arkaya çok hızlı kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
+            }
+
+            if (commandName === 'duyuru') {
+                if (!hasStaffPermission(member)) {
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
+                }
+                const hedefKanal = options.getChannel('kanal');
+                const duyuruMetni = options.getString('mesaj');
+
+                const embed = new EmbedBuilder()
+                    .setTitle('📢 TMA Resmî Karargâh Duyurusu')
+                    .setDescription(duyuruMetni)
+                    .setColor(0x3498DB)
+                    .setImage(TMA_LOGO_URL)
+                    .setFooter({ text: `Yayınlayan: ${interaction.user.tag}` })
+                    .setTimestamp();
+
+                await hedefKanal.send({ embeds: [embed] });
+                return interaction.reply({ content: `✅ Duyuru başarıyla ${hedefKanal} kanalına gönderildi! 🚀`, ephemeral: true });
+            }
+
+            if (commandName === 'roblox-profil') {
+                const username = options.getString('kullaniciadi');
+                await interaction.deferReply();
+
+                const result = await getRobloxUserGroups(username);
+                if (!result) {
+                    return interaction.editReply({ content: `❌ **${username}** adında bir Roblox oyuncusu bulunamadı.` });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`🎮 Roblox Profil: ${result.username}`)
+                    .setThumbnail(`https://www.roblox.com/headshot-thumbnail/image?userId=${result.userId}&width=420&height=420&format=png`)
+                    .addFields(
+                        { name: '🆔 Roblox ID', value: `${result.userId}`, inline: true },
+                        { name: '🌐 Toplam Grup Sayısı', value: `${result.groups.length} Grup`, inline: true },
+                        { name: '🔗 Profil Linki', value: `[Roblox Profiline Git](https://www.roblox.com/users/${result.userId}/profile)`, inline: false }
+                    )
+                    .setColor(0x2F3136)
+                    .setTimestamp();
+
+                return interaction.editReply({ embeds: [embed] });
             }
 
             if (commandName === 'grup-liste') {
@@ -402,7 +470,7 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.editReply({ content: `❌ **${username}** adlı kullanıcı bulunamadı veya herhangi bir grupta yer almıyor.` });
                 }
 
-                let responseText = `**İşlem başarıyla tamamlandı**\n**${result.username}** isimli kişinin mevcut olduğu gruplar:\n\n`;
+                let responseText = `**İşlem başarıyla tamamlandı** 🛡️\n**${result.username}** isimli kişinin mevcut olduğu gruplar:\n\n`;
                 result.groups.slice(0, 5).forEach(g => {
                     responseText += `**${g.group.name}**\n`;
                     responseText += `Grup IDsi: ${g.group.id}\n`;
@@ -430,10 +498,9 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ embeds: [embed], ephemeral: false });
             }
 
-            // /kick Komutu (Güvenlik Modülü)
             if (commandName === 'kick') {
                 if (!hasStaffPermission(member)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın!', ephemeral: true });
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
                 }
                 const hedefUye = options.getMember('kullanici');
                 const sebep = options.getString('sebep') || 'Belirtilmedi';
@@ -442,17 +509,16 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
                 }
                 if (!hedefUye.kickable) {
-                    return interaction.reply({ content: 'Bu üyeyi sunucudan atamam (Yetkim yetmiyor veya benden üst bir yetkili).', ephemeral: true });
+                    return interaction.reply({ content: 'Bu üyeyi sunucudan atamam.', ephemeral: true });
                 }
 
                 await hedefUye.kick(sebep);
-                return interaction.reply({ content: `✅ **${hedefUye.user.tag}** sunucudan atıldı. Sebep: *${sebep}*`, ephemeral: false });
+                return interaction.reply({ content: `✅ **${hedefUye.user.tag}** sunucudan atıldı. Sebep: *${sebep}* 🚪`, ephemeral: false });
             }
 
-            // /ban Komutu (Güvenlik Modülü)
             if (commandName === 'ban') {
                 if (!hasStaffPermission(member)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın!', ephemeral: true });
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yetkili olmalısın! 🛑', ephemeral: true });
                 }
                 const hedefUye = options.getMember('kullanici');
                 const sebep = options.getString('sebep') || 'Belirtilmedi';
@@ -461,16 +527,16 @@ client.on('interactionCreate', async (interaction) => {
                     return interaction.reply({ content: 'Böyle bir üye bulunamadı!', ephemeral: true });
                 }
                 if (!hedefUye.bannable) {
-                    return interaction.reply({ content: 'Bu üyeyi yasaklayamam (Yetkim yetmiyor).', ephemeral: true });
+                    return interaction.reply({ content: 'Bu üyeyi yasaklayamam.', ephemeral: true });
                 }
 
                 await hedefUye.ban({ reason: sebep });
-                return interaction.reply({ content: `🔨 **${hedefUye.user.tag}** sunucudan kalıcı olarak yasaklandı! Sebep: *${sebep}*`, ephemeral: false });
+                return interaction.reply({ content: `🔨 **${hedefUye.user.tag}** sunucudan kalıcı olarak yasaklandı! Sebep: *${sebep}* ⚖️`, ephemeral: false });
             }
 
             if (commandName === 'adam-çekme') {
                 if (!hasAdamCekmePermission(member)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için gerekli ordu izinlerine sahip değilsin!', ephemeral: true });
+                    return interaction.reply({ content: 'Bu komutu kullanmak için gerekli ordu izinlerine sahip değilsin! 🛑', ephemeral: true });
                 }
 
                 const hedefUye = options.getUser('kullanici');
@@ -480,7 +546,7 @@ client.on('interactionCreate', async (interaction) => {
                 adamCekmeCounts.set(hedefId, mevcutSayi + 1);
 
                 return interaction.reply({
-                    content: `✅ Başarıyla işlendi! **${hedefUye.tag}** adlı yetkilinin çektiği toplam adam sayısı: **${mevcutSayi + 1}** oldu.`,
+                    content: `✅ Başarıyla işlendi! **${hedefUye.tag}** adlı yetkilinin çektiği toplam adam sayısı: **${mevcutSayi + 1}** oldu. 🎖️`,
                     ephemeral: false
                 });
             }
@@ -515,7 +581,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (commandName === 'bilet') {
                 if (!hasStaffPermission(member)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkili rütben yok!', ephemeral: true });
+                    return interaction.reply({ content: 'Bu komutu kullanmak için yeterli yetkili rütben yok! 🛑', ephemeral: true });
                 }
 
                 const embed = new EmbedBuilder()
@@ -545,7 +611,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (commandName === 'rütbeler') {
                 const rutbeMetni = 
-                    `***TMA RESMİ KADEME VE RÜTBE LİSTESİ***\n` +
+                    `***TMA RESMİ KADEME VE RÜTBE LİSTESİ*** 🎖️\n` +
                     `- OR-1 Er | OR-2 Onbaşı | OR-3 Uzman Onbaşı\n` +
                     `- OR-4 Çavuş | OR-5 Uzman Çavuş\n` +
                     `- OR-6 Astsubay Çavuş / Kıdemli Çavuş\n` +
@@ -615,7 +681,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (commandName === 'güvenlik') {
                 if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                    return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!', ephemeral: true });
+                    return interaction.reply({ content: 'Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın! 🛑', ephemeral: true });
                 }
                 const durum = options.getString('durum');
                 if (durum === 'aktif') {
@@ -627,14 +693,13 @@ client.on('interactionCreate', async (interaction) => {
                 }
             }
 
-            // /bilgi Komutu (İstediğin gibi güncellendi)
             if (commandName === 'bilgi') {
                 const embed = new EmbedBuilder()
                     .setTitle('TMA Ordusu Botu Bilgi Sistemi')
                     .setThumbnail(TMA_LOGO_URL)
                     .addFields(
-                        { name: '👑 Geliştirici / Sahip', value: '@nesne123', inline: false },
-                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu & Moderasyon:** `/sunucu-bilgi`, `/kick` ve `/ban` komutları.' }
+                        { name: '👑 Geliştirici / Sahip', value: '<@nesne123>', inline: false },
+                        { name: '🛡️ Botun Yetenekleri ve Sistemleri', value: '• **Otomatik Güvenlik & Küfür Filtresi:** Küfürleri engeller ve otomatik susturma (mute) uygular.\n• **Destek & Bilet Sistemi:** Kategori bazlı bilet açma ve transfer bileti gizliliği.\n• **Roblox Entegrasyonu:** `/grup`, `/grup-liste`, `/roblox-profil` ve `/aktiflik-sorgu` komutları.\n• **Seviye ve Mesaj Yarışı:** 200 mesaj sınırlı, seviye atlama duyurulu XP sistemi (`/seviye-tablosu`).\n• **Adam Çekme Takibi:** Yetkililere özel `/adam-çekme` ve herkese açık `/adam-çekme-tablosu`.\n• **Sunucu & Moderasyon:** `/sunucu-bilgi`, `/duyuru`, `/kick` ve `/ban` komutları.' }
                     )
                     .setColor(0x3498DB)
                     .setTimestamp();
@@ -651,7 +716,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.editReply({ embeds: [embed] });
             }
 
-            return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı!`, ephemeral: true });
+            return interaction.reply({ content: `**/${commandName}** komutu başarıyla çalıştırıldı! ✨`, ephemeral: true });
         }
 
         if (interaction.isButton() && interaction.customId === 'start_ticket_process') {
@@ -694,7 +759,7 @@ client.on('interactionCreate', async (interaction) => {
             const selectedCategory = userSelectedCategory.get(selectionKey);
 
             if (!selectedCategory) {
-                return interaction.reply({ content: 'Lütfen önce menüden bir kategori seçin!', ephemeral: true });
+                return interaction.reply({ content: 'Lütfen önce menüden bir kategori seçin! 🛑', ephemeral: true });
             }
 
             const targetRoleID = BILET_ROLLERI[selectedCategory];
@@ -729,14 +794,14 @@ client.on('interactionCreate', async (interaction) => {
                     allowedMentions: { parse: [] }
                 });
 
-                await interaction.editReply({ content: `Destek talebiniz başarıyla oluşturuldu: ${ticketChannel}` });
+                await interaction.editReply({ content: `Destek talebiniz başarıyla oluşturuldu: ${ticketChannel} 🎫` });
             } catch (err) {
                 await interaction.editReply({ content: 'Bilet kanalı oluşturulurken bir hata oluştu!' });
             }
         }
 
         if (interaction.isButton() && interaction.customId === 'close_ticket') {
-            await interaction.reply({ content: 'Bilet güvenli bir şekilde 5 saniye içinde kapatılıyor...' });
+            await interaction.reply({ content: 'Bilet güvenli bir şekilde 5 saniye içinde kapatılıyor... 🔒' });
             setTimeout(() => { interaction.channel.delete().catch(() => {}); }, SECURITY.TICKET_DELETE_DELAY_MS);
         }
     } catch (error) { console.error('Interaction hatası:', error); }
