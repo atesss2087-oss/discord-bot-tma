@@ -58,33 +58,38 @@ const BILET_ROLLERI = {
 const userSelectedCategory = new Map();
 const securityCommandMap = new Map();
 
+// --- AĞAÇ SİSTEMİ VERİSİ ---
+let treeData = {
+    height: 33,
+    lastWateredBy: "Henüz sulanmadı",
+    image: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?w=600"
+};
+
+// --- HONEYPOT SAYACI ---
+let honeypotKicks = 0;
+
 // --- FİLM ARŞİVİ ---
 const FILM_ARSIVI = [
     { baslik: "Hababam Sınıfı", tur: "Komedi / Klasik", yil: 1975, puan: "9.3/10", konu: "Özel Çamlıca Lisesi'ndeki neşeli ve haylaz öğrencilerin maceraları.", afis: "https://upload.wikimedia.org/wikipedia/tr/b/b5/Hababam_S%C4%B1n%C4%B1f%C4%B1_film_afii.jpg" },
     { baslik: "Dağ II", tur: "Aksiyon / Dram", yil: 2016, puan: "8.8/10", konu: "Zorlu şartlarda vatan savunması yapan özel timin hikayesi.", afis: "https://upload.wikimedia.org/wikipedia/tr/3/36/Da%C4%9F_2_film_afii.jpg" },
     { baslik: "The Dark Knight", tur: "Aksiyon / Suç", yil: 2008, puan: "9.0/10", konu: "Şehri kaosa sürükleyen suç dehasına karşı verilen adalet mücadelesi.", afis: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=500" },
-    { baslik: "The Conjuring", tur: "Korku / Gizem", yil: 2013, puan: "7.5/10", konu: "Paranormal olaylar yaşayan bir ailenin gerilim dolu hikayesi.", afis: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500" }
+    { baslik: "The Conjuring", tur: "Korku / Gizem", yil: 2013, puan: "7.5/10", konu: "Paranormal olaylar yaşayan ailenin gerilim dolu hikayesi.", afis: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500" }
 ];
 
 function rastgeleFilmSec() {
     return FILM_ARSIVI[Math.floor(Math.random() * FILM_ARSIVI.length)];
 }
 
-// Belirtilen rolün veya üstünün kontrolü (Discord rol hiyerarşisine göre veya ID ile)
 function hasStaffPermission(member) {
     if (!member) return false;
     if (member.permissions.has(PermissionsBitField.Flags.Administrator)) return true;
-    
-    // Belirtilen ID'ye sahip rolü var mı kontrolü
     if (member.roles.cache.has(YETKILI_ROL_ID)) return true;
 
-    // Rol hiyerarşisi kontrolü (Belirtilen rolün pozisyonundan yukarıda bir role sahip mi)
     const targetRole = member.guild.roles.cache.get(YETKILI_ROL_ID);
     if (targetRole) {
         const highestMemberRole = member.roles.highest;
         if (highestMemberRole.position >= targetRole.position) return true;
     }
-
     return false;
 }
 
@@ -173,7 +178,9 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('grup-liste').setDescription('Roblox kullanıcısının gruplarını sayfa sayfa listeler.').addStringOption(opt => opt.setName('kullaniciadi').setDescription('Roblox kullanıcı adı').setRequired(true)),
         new SlashCommandBuilder().setName('aktiflik-duyuru').setDescription('TMA aktiflik çağrısı yayınlar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Kanal').setRequired(true)),
         new SlashCommandBuilder().setName('kanal-kilitle').setDescription('Bulunulan kanalı mesaj yazımına kapatır (Sadece yetkili).'),
-        new SlashCommandBuilder().setName('kanal-aç').setDescription('Kilitli olan kanalı tekrar mesaj yazımına açar (Sadece yetkili).')
+        new SlashCommandBuilder().setName('kanal-aç').setDescription('Kilitli olan kanalı tekrar mesaj yazımına açar (Sadece yetkili).'),
+        new SlashCommandBuilder().setName('ağaç').setDescription('Sunucu için büyüme ağacı panelini kurar.'),
+        new SlashCommandBuilder().setName('honeypot-kur').setDescription('Bulunulan kanala Türkçe Honeypot güvenlik paneli kurar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Panelin kurulacağı kanal').setRequired(true))
     ].map(command => command.toJSON());
 
     try {
@@ -186,14 +193,44 @@ client.once('ready', async () => {
 client.on("messageCreate", async (message) => {
     if (!message.guild || message.author.bot || !message.member) return;
 
-    const content = message.content.toLowerCase();
+    // --- HONEYPOT KONTROLÜ ---
+    if (message.channel.name.includes('buraya-yazma') || message.channel.name.includes('honeypot')) {
+        try {
+            if (message.deletable) await message.delete();
+            honeypotKicks++;
+            if (message.member.kickable) {
+                await message.member.kick("Honeypot kanalına mesaj atma ihlali");
+            }
+        } catch (e) {}
+        return;
+    }
 
+    const rawContent = message.content;
+    const content = rawContent.toLowerCase();
+
+    // --- LİNK KORUMA (Yetkili rolü ve üstü hariç) ---
+    const linkVarMi = rawContent.includes("http://") || rawContent.includes("https://") || rawContent.includes("www.") || rawContent.includes("discord.gg") || rawContent.includes("t.me");
+    if (linkVarMi) {
+        if (!hasStaffPermission(message.member)) {
+            try {
+                if (message.deletable) await message.delete();
+                const warningMsg = await message.channel.send({
+                    content: `${message.author}, bu kanalda sadece yetkililer link paylaşabilir! 🛑`,
+                    allowedMentions: { users: [message.author.id] }
+                });
+                setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
+            } catch (e) {}
+            return;
+        }
+    }
+
+    // --- SOHBET YANITLARI ---
     if (content === 'sa' || content === 'selam' || content === 'merhaba') {
         await message.reply('As cano hoş geldin nasılsın');
         return;
     }
 
-    if (content.includes('iyi') || content.includes('iyiyim') || content.includes('sğl') || content.includes('sagol')) {
+    if (content.includes('iyi sen') || content.includes('iyiyim sen') || content === 'iyi' || content === 'iyiyim') {
         await message.reply('Ben de çok iyiyim çok teşekkür ederim cano adamsın kralsın');
         return;
     }
@@ -208,8 +245,7 @@ client.on('interactionCreate', async (interaction) => {
                 return interaction.reply({ content: 'Çok hızlı komut kullanıyorsun, 2 saniye bekle! ⏳', ephemeral: true });
             }
 
-            // Sadece yetkili izni gerektiren komutların kontrolü
-            const staffOnlyCommands = ['bilet', 'duyuru', 'rehber', 'güvenlik', 'tam-yasakla', 'yasakla', 'aktiflik-duyuru', 'at', 'ban', 'kanal-kilitle', 'kanal-aç'];
+            const staffOnlyCommands = ['bilet', 'duyuru', 'rehber', 'güvenlik', 'tam-yasakla', 'yasakla', 'aktiflik-duyuru', 'at', 'ban', 'kanal-kilitle', 'kanal-aç', 'honeypot-kur'];
             
             if (staffOnlyCommands.includes(commandName) && !hasStaffPermission(member)) {
                 return interaction.reply({ content: '❌ Bu komutu kullanmak için yeterli yetkiye sahip değilsin (Gerekli rol: <@&' + YETKILI_ROL_ID + '> ve üstü).', ephemeral: true });
@@ -275,6 +311,38 @@ client.on('interactionCreate', async (interaction) => {
 
                 await hedefKanal.send({ embeds: [embed] });
                 return interaction.reply({ content: `✅ Film önerisi başarıyla <#${FILM_KANAL_ID}> kanalına gönderildi! 🍿`, ephemeral: true });
+            }
+
+            if (commandName === 'ağaç') {
+                const embed = new EmbedBuilder()
+                    .setTitle('🌲 TMA AĞAÇ')
+                    .setDescription(`Your tree is **${treeData.height}ft** tall.\n\nLast watered by: ${treeData.lastWateredBy}\n\nReady to be watered!`)
+                    .setImage(treeData.image)
+                    .setColor(0x2ECC71)
+                    .setTimestamp();
+
+                const waterButton = new ButtonBuilder()
+                    .setCustomId('water_tree')
+                    .setEmoji('💧')
+                    .setStyle(ButtonStyle.Primary);
+
+                const row = new ActionRowBuilder().addComponents(waterButton);
+
+                return interaction.reply({ embeds: [embed], components: [row] });
+            }
+
+            if (commandName === 'honeypot-kur') {
+                const hedefKanal = options.getChannel('kanal');
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('🍯 GÜVENLİK UYARISI')
+                    .setDescription('**BU KANALA MESAJ GÖNDERMEK YASAKTIR!**\n\nBu kanal spam botlarını ve kural ihlallerini yakalamak için kurulmuştur. Buraya atılacak herhangi bir mesaj sahibini doğrudan sunucudan atacaktır.')
+                    .addFields({ name: '🍯 Atılan Kişi Sayısı (Kicks)', value: `${honeypotKicks}`, inline: true })
+                    .setColor(0xE67E22)
+                    .setTimestamp();
+
+                await hedefKanal.send({ embeds: [embed] });
+                return interaction.reply({ content: `✅ Türkçe Honeypot güvenlik paneli başarıyla ${hedefKanal} kanalına kuruldu!`, ephemeral: true });
             }
 
             if (commandName === 'bilet') {
@@ -486,6 +554,29 @@ client.on('interactionCreate', async (interaction) => {
                 });
                 return;
             }
+        }
+
+        // --- AĞAÇ SULAMA BUTONU ---
+        if (interaction.isButton() && interaction.customId === 'water_tree') {
+            treeData.height += 1;
+            treeData.lastWateredBy = `${interaction.user}`;
+
+            const updatedEmbed = new EmbedBuilder()
+                .setTitle('🌲 TMA AĞAÇ')
+                .setDescription(`Your tree is **${treeData.height}ft** tall.\n\nLast watered by: ${treeData.lastWateredBy}\n\nReady to be watered!`)
+                .setImage(treeData.image)
+                .setColor(0x2ECC71)
+                .setTimestamp();
+
+            const waterButton = new ButtonBuilder()
+                .setCustomId('water_tree')
+                .setEmoji('💧')
+                .setStyle(ButtonStyle.Primary);
+
+            const row = new ActionRowBuilder().addComponents(waterButton);
+
+            await interaction.update({ embeds: [updatedEmbed], components: [row] });
+            return;
         }
 
         // --- BİLET SİSTEMİ ---
