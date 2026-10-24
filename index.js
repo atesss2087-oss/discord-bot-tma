@@ -180,7 +180,8 @@ client.once('ready', async () => {
         new SlashCommandBuilder().setName('kanal-kilitle').setDescription('Bulunulan kanalı mesaj yazımına kapatır (Sadece yetkili).'),
         new SlashCommandBuilder().setName('kanal-aç').setDescription('Kilitli olan kanalı tekrar mesaj yazımına açar (Sadece yetkili).'),
         new SlashCommandBuilder().setName('ağaç').setDescription('Sunucu için büyüme ağacı panelini kurar.'),
-        new SlashCommandBuilder().setName('honeypot-kur').setDescription('Bulunulan kanala Türkçe Honeypot güvenlik paneli kurar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Panelin kurulacağı kanal').setRequired(true))
+        new SlashCommandBuilder().setName('honeypot-kur').setDescription('Bulunulan kanala Türkçe Honeypot güvenlik paneli kurar (Sadece yetkili).').addChannelOption(opt => opt.setName('kanal').setDescription('Panelin kurulacağı kanal').setRequired(true)),
+        new SlashCommandBuilder().setName('rol-duzenle').setDescription('Rollerin hiyerarşisini ve temel izinlerini otomatik en düşükten en üste ayarlar (Yönetici).')
     ].map(command => command.toJSON());
 
     try {
@@ -249,6 +250,55 @@ client.on('interactionCreate', async (interaction) => {
             
             if (staffOnlyCommands.includes(commandName) && !hasStaffPermission(member)) {
                 return interaction.reply({ content: '❌ Bu komutu kullanmak için yeterli yetkiye sahip değilsin (Gerekli rol: <@&' + YETKILI_ROL_ID + '> ve üstü).', ephemeral: true });
+            }
+
+            // --- OTOMATİK ROL VE İZİN DÜZENLEME KOMUTU ---
+            if (commandName === 'rol-duzenle') {
+                if (!member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                    return interaction.reply({ content: '❌ Bu komutu sadece sunucu Yöneticileri kullanabilir!', ephemeral: true });
+                }
+
+                await interaction.deferReply({ ephemeral: true });
+                try {
+                    const roles = await guild.roles.fetch();
+                    const sortedRoles = Array.from(roles.values())
+                        .filter(r => r.id !== guild.id && !r.managed) // @everyone ve bot/entegrasyon rollerini hariç tut
+                        .sort((a, b) => a.position - b.position);
+
+                    const rolePositions = sortedRoles.map((r, index) => ({
+                        role: r.id,
+                        position: index + 1
+                    }));
+
+                    // Önce hiyerarşik sıralamayı en düşükten en üste otomatik yap
+                    await guild.roles.setPositions(rolePositions);
+
+                    // Üst düzey rollerin (Yönetici ve Komutan seviyesi) temel izinlerini otomatik yapılandır
+                    for (const r of sortedRoles) {
+                        if (r.position > sortedRoles.length / 2) {
+                            // Üst roller için temel yönetim izinleri
+                            await r.setPermissions([
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ManageMessages,
+                                PermissionsBitField.Flags.KickMembers,
+                                PermissionsBitField.Flags.BanMembers,
+                                PermissionsBitField.Flags.MuteMembers
+                            ]).catch(() => {});
+                        } else {
+                            // Alt roller için normal üye izinleri
+                            await r.setPermissions([
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory
+                            ]).catch(() => {});
+                        }
+                    }
+
+                    return interaction.editReply({ content: '✅ Sunucudaki tüm roller başarıyla en düşükten en üste sıralandı ve temel izinleri otomatik olarak yapılandırıldı!' });
+                } catch (err) {
+                    return interaction.editReply({ content: '❌ Roller düzenlenirken hata oluştu. Botun rolü listede en üstte ve "Rolleri Yönet" yetkisi açık olmalıdır.' });
+                }
             }
 
             if (commandName === 'aktiflık-sorgu') {
